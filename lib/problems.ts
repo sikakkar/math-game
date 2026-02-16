@@ -225,3 +225,108 @@ export function generateProblem(
   }
   return generateMultiplication(level);
 }
+
+// --- Config-based problem generation for curriculum skills ---
+
+import type { ProblemConfig } from "./curriculum";
+
+function generateAdditionFromConfig(config: ProblemConfig): Problem {
+  const { operand1Range, operand2Range, constraints } = config;
+  let a: number, b: number;
+
+  if (constraints?.doubles) {
+    a = randInt(operand1Range[0], operand1Range[1]);
+    b = a;
+  } else {
+    a = randInt(operand1Range[0], operand1Range[1]);
+    b = randInt(operand2Range[0], operand2Range[1]);
+    if (constraints?.sumMax) {
+      // Re-roll until within sum constraint (max 50 tries, then clamp)
+      let tries = 0;
+      while (a + b > constraints.sumMax && tries < 50) {
+        a = randInt(operand1Range[0], operand1Range[1]);
+        b = randInt(operand2Range[0], operand2Range[1]);
+        tries++;
+      }
+      if (a + b > constraints.sumMax) {
+        b = Math.max(operand2Range[0], constraints.sumMax - a);
+      }
+    }
+  }
+
+  const answer = a + b;
+  const question = `${a} + ${b}`;
+  const wrong = generateWrongChoices(answer, 3);
+  return { question, answer, choices: shuffle([answer, ...wrong]) };
+}
+
+function generateSubtractionFromConfig(config: ProblemConfig): Problem {
+  const { operand1Range, operand2Range } = config;
+  let a = randInt(operand1Range[0], operand1Range[1]);
+  let b = randInt(operand2Range[0], Math.min(operand2Range[1], a));
+  // Ensure non-negative result
+  if (b > a) [a, b] = [b, a];
+
+  const answer = a - b;
+  const question = `${a} - ${b}`;
+  const wrong = generateWrongChoices(answer, 3);
+  return { question, answer, choices: shuffle([answer, ...wrong]) };
+}
+
+function generateMultiplicationFromConfig(config: ProblemConfig): Problem {
+  const { operand1Range, operand2Range, constraints } = config;
+  let a = randInt(operand1Range[0], operand1Range[1]);
+  let b = constraints?.fixedOperand ?? randInt(operand2Range[0], operand2Range[1]);
+
+  // Randomly swap order so it's not always "small × big"
+  if (Math.random() > 0.5) [a, b] = [b, a];
+
+  const answer = a * b;
+  const question = `${a} × ${b}`;
+  const wrong = generateWrongChoices(answer, 3);
+  return { question, answer, choices: shuffle([answer, ...wrong]) };
+}
+
+function generateDivisionFromConfig(config: ProblemConfig): Problem {
+  const { operand1Range, operand2Range, constraints } = config;
+  // Generate as reversed multiplication for exact division
+  const quotient = randInt(operand1Range[0], operand1Range[1]);
+  const divisor = constraints?.fixedOperand ?? randInt(operand2Range[0], operand2Range[1]);
+  const dividend = quotient * divisor;
+
+  const answer = quotient;
+  const question = `${dividend} ÷ ${divisor}`;
+  const wrong = generateWrongChoices(answer, 3);
+  return { question, answer, choices: shuffle([answer, ...wrong]) };
+}
+
+function generateMixedAddSubFromConfig(config: ProblemConfig): Problem {
+  if (Math.random() > 0.5) {
+    return generateAdditionFromConfig(config);
+  }
+  return generateSubtractionFromConfig(config);
+}
+
+function generateMixedMulDivFromConfig(config: ProblemConfig): Problem {
+  if (Math.random() > 0.5) {
+    return generateMultiplicationFromConfig(config);
+  }
+  return generateDivisionFromConfig(config);
+}
+
+export function generateFromConfig(config: ProblemConfig): Problem {
+  switch (config.type) {
+    case "addition":
+      return generateAdditionFromConfig(config);
+    case "subtraction":
+      return generateSubtractionFromConfig(config);
+    case "multiplication":
+      return generateMultiplicationFromConfig(config);
+    case "division":
+      return generateDivisionFromConfig(config);
+    case "mixed_add_sub":
+      return generateMixedAddSubFromConfig(config);
+    case "mixed_mul_div":
+      return generateMixedMulDivFromConfig(config);
+  }
+}

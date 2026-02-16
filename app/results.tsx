@@ -2,43 +2,63 @@ import { useEffect, useState } from "react";
 import { View, Text, Pressable, StyleSheet, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import { useGame } from "../lib/context";
+import { SKILL_MAP, SKILL_SECTION_MAP, MASTERY_THRESHOLDS } from "../lib/curriculum";
+
+const MASTERY_LABELS: Record<number, string> = {
+  0: "Not Started",
+  1: "Learning",
+  2: "Practicing",
+  3: "Mastered",
+};
 
 export default function ResultsScreen() {
   const {
     sessionScore,
     sessionMissed,
-    progress,
-    profile,
+    activeSkillId,
+    profileStats,
     syncResults,
-    startSession,
+    startLesson,
     clearProfile,
+    getSkillProgress,
   } = useGame();
   const router = useRouter();
   const [synced, setSynced] = useState(false);
+  const [prevLevel, setPrevLevel] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!synced) {
+    if (!synced && activeSkillId) {
+      // Capture level before sync
+      const progress = getSkillProgress(activeSkillId);
+      setPrevLevel(progress?.mastery_level ?? 0);
       syncResults().then(() => setSynced(true));
     }
-  }, [synced, syncResults]);
+  }, [synced, syncResults, activeSkillId, getSkillProgress]);
+
+  const skill = activeSkillId ? SKILL_MAP[activeSkillId] : null;
+  const section = activeSkillId ? SKILL_SECTION_MAP[activeSkillId] : null;
+  const sectionColor = section?.color ?? "#6C63FF";
+
+  // Current mastery after sync
+  const currentProgress = activeSkillId ? getSkillProgress(activeSkillId) : null;
+  const currentLevel = currentProgress?.mastery_level ?? 0;
+  const didAdvance = prevLevel !== null && currentLevel > prevLevel;
 
   const stars = sessionScore === 10 ? 3 : sessionScore >= 8 ? 2 : 1;
   const starDisplay = Array(3)
     .fill(null)
-    .map((_, i) => (i < stars ? "★" : "☆"))
+    .map((_, i) => (i < stars ? "\u2605" : "\u2606"))
     .join(" ");
 
-  const trackColor =
-    profile?.track === "multiplication" ? "#FF8C42" : "#6C63FF";
-
-  const handlePlayAgain = () => {
-    startSession();
-    router.replace("/game");
+  const handlePracticeAgain = () => {
+    if (activeSkillId) {
+      startLesson(activeSkillId);
+      router.replace("/game");
+    }
   };
 
-  const handleSwitch = () => {
-    clearProfile();
-    router.replace("/");
+  const handleBackToPath = () => {
+    router.replace("/path");
   };
 
   return (
@@ -48,20 +68,49 @@ export default function ResultsScreen() {
     >
       <Text style={styles.stars}>{starDisplay}</Text>
 
+      {skill && (
+        <Text style={[styles.skillName, { color: sectionColor }]}>
+          {skill.name}
+        </Text>
+      )}
+
       <Text style={styles.scoreText}>
         {sessionScore} / 10 correct
       </Text>
 
+      {/* Mastery indicator */}
+      <View style={styles.masterySection}>
+        <Text style={styles.masteryLabel}>
+          {MASTERY_LABELS[currentLevel]}
+        </Text>
+        <View style={styles.masteryDots}>
+          {[1, 2, 3].map((level) => (
+            <View
+              key={level}
+              style={[
+                styles.dot,
+                currentLevel >= level ? styles.dotFilled : styles.dotEmpty,
+              ]}
+            />
+          ))}
+        </View>
+        {didAdvance && synced && (
+          <Text style={styles.advanceText}>
+            Level up! You reached {MASTERY_LABELS[currentLevel]}!
+          </Text>
+        )}
+      </View>
+
       <View style={styles.statsRow}>
         <View style={styles.statBox}>
           <Text style={styles.statNumber}>
-            {progress?.total_completed ?? 0}
+            {profileStats?.total_completed ?? 0}
           </Text>
           <Text style={styles.statLabel}>Total solved</Text>
         </View>
         <View style={styles.statBox}>
           <Text style={styles.statNumber}>
-            {progress?.streak ?? 0}
+            {profileStats?.streak ?? 0}
           </Text>
           <Text style={styles.statLabel}>Day streak</Text>
         </View>
@@ -80,17 +129,17 @@ export default function ResultsScreen() {
 
       <View style={styles.buttons}>
         <Pressable
-          style={[styles.button, { backgroundColor: trackColor }]}
-          onPress={handlePlayAgain}
+          style={[styles.button, { backgroundColor: sectionColor }]}
+          onPress={handlePracticeAgain}
         >
-          <Text style={styles.buttonText}>Play Again</Text>
+          <Text style={styles.buttonText}>Practice Again</Text>
         </Pressable>
         <Pressable
           style={[styles.button, styles.buttonOutline]}
-          onPress={handleSwitch}
+          onPress={handleBackToPath}
         >
           <Text style={[styles.buttonText, { color: "#6B7280" }]}>
-            Switch Player
+            Back to Path
           </Text>
         </Pressable>
       </View>
@@ -111,11 +160,47 @@ const styles = StyleSheet.create({
     color: "#FBBF24",
     marginBottom: 16,
   },
+  skillName: {
+    fontSize: 22,
+    fontWeight: "700",
+    marginBottom: 8,
+  },
   scoreText: {
     fontSize: 28,
     fontWeight: "700",
     color: "#1E1B4B",
-    marginBottom: 32,
+    marginBottom: 20,
+  },
+  masterySection: {
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  masteryLabel: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#374151",
+    marginBottom: 8,
+  },
+  masteryDots: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  dot: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+  },
+  dotFilled: {
+    backgroundColor: "#FBBF24",
+  },
+  dotEmpty: {
+    backgroundColor: "#D1D5DB",
+  },
+  advanceText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#22C55E",
+    marginTop: 12,
   },
   statsRow: {
     flexDirection: "row",

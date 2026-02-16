@@ -1,29 +1,44 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
-import { supabase, type Profile, type Progress } from "./supabase";
-import { generateProblem, type Problem } from "./problems";
+import { supabase, type Profile, type SkillProgress, type ProfileStats } from "./supabase";
+import { generateFromConfig, type Problem } from "./problems";
+import {
+  SKILL_MAP,
+  SKILL_SECTION_MAP,
+  ALL_SKILLS,
+  MASTERY_THRESHOLDS,
+  type Skill,
+} from "./curriculum";
 
 type MissedProblem = { question: string; answer: number };
 
+export type SkillStatus =
+  | "locked"
+  | "available"
+  | "learning"
+  | "practicing"
+  | "mastered";
+
 type GameState = {
   profile: Profile | null;
-  progress: Progress | null;
+  profileStats: ProfileStats | null;
+  skillProgressMap: Record<string, SkillProgress>;
+  activeSkillId: string | null;
   currentProblem: Problem | null;
   problemIndex: number;
   sessionScore: number;
   sessionMissed: MissedProblem[];
-  consecutiveCorrect: number;
-  consecutiveWrong: number;
-  sessionLevel: number;
 };
 
 type GameContextType = GameState & {
   selectProfile: (profile: Profile) => Promise<void>;
-  startSession: () => void;
+  startLesson: (skillId: string) => void;
   submitAnswer: (choice: number) => "correct" | "wrong";
   nextProblem: () => void;
   isSessionOver: () => boolean;
   syncResults: () => Promise<void>;
   clearProfile: () => void;
+  getSkillStatus: (skillId: string) => SkillStatus;
+  getSkillProgress: (skillId: string) => SkillProgress | null;
 };
 
 const PROBLEMS_PER_SESSION = 10;
@@ -33,75 +48,99 @@ const GameContext = createContext<GameContextType | null>(null);
 export function GameProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<GameState>({
     profile: null,
-    progress: null,
+    profileStats: null,
+    skillProgressMap: {},
+    activeSkillId: null,
     currentProblem: null,
     problemIndex: 0,
     sessionScore: 0,
     sessionMissed: [],
-    consecutiveCorrect: 0,
-    consecutiveWrong: 0,
-    sessionLevel: 1,
   });
 
   const selectProfile = useCallback(async (profile: Profile) => {
-    const { data } = await supabase
-      .from("progress")
+    // Fetch all skill progress for this profile
+    const { data: progressData } = await supabase
+      .from("skill_progress")
+      .select("*")
+      .eq("profile_id", profile.id);
+
+    const skillProgressMap: Record<string, SkillProgress> = {};
+    for (const sp of progressData ?? []) {
+      skillProgressMap[sp.skill_id] = sp;
+    }
+
+    // Fetch profile stats
+    const { data: statsData } = await supabase
+      .from("profile_stats")
       .select("*")
       .eq("profile_id", profile.id)
       .single();
 
-    const progress: Progress = data ?? {
+    const profileStats: ProfileStats = statsData ?? {
       id: "",
       profile_id: profile.id,
-      current_level: 1,
       streak: 0,
       total_completed: 0,
-      missed_problems: [],
-      updated_at: new Date().toISOString(),
+      last_played_at: new Date().toISOString(),
     };
 
     setState((s) => ({
       ...s,
       profile,
-      progress,
-      sessionLevel: progress.current_level,
+      profileStats,
+      skillProgressMap,
     }));
   }, []);
 
-  const getLevelForProblem = useCallback(
-    (index: number, baseLevel: number): number => {
-      if (index < 2) {
-        // warm-up: one level below
-        return Math.max(1, baseLevel - 1);
+  const getSkillStatus = useCallback(
+    (skillId: string): SkillStatus => {
+      const skill = SKILL_MAP[skillId];
+      if (!skill) return "locked";
+
+      const progress = state.skillProgressMap[skillId];
+
+      // If has progress, return based on mastery level
+      if (progress && progress.mastery_level > 0) {
+        if (progress.mastery_level >= 3) return "mastered";
+        if (progress.mastery_level >= 2) return "practicing";
+        return "learning";
       }
-      if (index >= 8) {
-        // challenge: one level above
-        return Math.min(10, baseLevel + 1);
+
+      // Check prerequisite
+      if (!skill.prerequisite) return "available";
+
+      const prereqProgress = state.skillProgressMap[skill.prerequisite];
+      if (prereqProgress && prereqProgress.mastery_level >= 2) {
+        return "available";
       }
-      return baseLevel;
+
+      return "locked";
     },
-    []
+    [state.skillProgressMap]
   );
 
-  const startSession = useCallback(() => {
-    setState((s) => {
-      const level = s.progress?.current_level ?? 1;
-      const track = s.profile?.track ?? "addition_subtraction";
-      const problemLevel = getLevelForProblem(0, level);
-      const problem = generateProblem(track, problemLevel);
+  const getSkillProgress = useCallback(
+    (skillId: string): SkillProgress | null => {
+      return state.skillProgressMap[skillId] ?? null;
+    },
+    [state.skillProgressMap]
+  );
 
-      return {
-        ...s,
-        problemIndex: 0,
-        sessionScore: 0,
-        sessionMissed: [],
-        consecutiveCorrect: 0,
-        consecutiveWrong: 0,
-        sessionLevel: level,
-        currentProblem: problem,
-      };
-    });
-  }, [getLevelForProblem]);
+  const startLesson = useCallback((skillId: string) => {
+    const skill = SKILL_MAP[skillId];
+    if (!skill) return;
+
+    const problem = generateFromConfig(skill.problemConfig);
+
+    setState((s) => ({
+      ...s,
+      activeSkillId: skillId,
+      problemIndex: 0,
+      sessionScore: 0,
+      sessionMissed: [],
+      currentProblem: problem,
+    }));
+  }, []);
 
   const submitAnswer = useCallback(
     (choice: number): "correct" | "wrong" => {
@@ -110,34 +149,16 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
       const isCorrect = choice === problem.answer;
 
-      setState((s) => {
-        let newLevel = s.sessionLevel;
-        let consCorrect = isCorrect ? s.consecutiveCorrect + 1 : 0;
-        let consWrong = isCorrect ? 0 : s.consecutiveWrong + 1;
-
-        if (consCorrect >= 3) {
-          newLevel = Math.min(10, newLevel + 1);
-          consCorrect = 0;
-        }
-        if (consWrong >= 2) {
-          newLevel = Math.max(1, newLevel - 1);
-          consWrong = 0;
-        }
-
-        return {
-          ...s,
-          sessionScore: isCorrect ? s.sessionScore + 1 : s.sessionScore,
-          sessionMissed: isCorrect
-            ? s.sessionMissed
-            : [
-                ...s.sessionMissed,
-                { question: problem.question, answer: problem.answer },
-              ],
-          consecutiveCorrect: consCorrect,
-          consecutiveWrong: consWrong,
-          sessionLevel: newLevel,
-        };
-      });
+      setState((s) => ({
+        ...s,
+        sessionScore: isCorrect ? s.sessionScore + 1 : s.sessionScore,
+        sessionMissed: isCorrect
+          ? s.sessionMissed
+          : [
+              ...s.sessionMissed,
+              { question: problem.question, answer: problem.answer },
+            ],
+      }));
 
       return isCorrect ? "correct" : "wrong";
     },
@@ -151,80 +172,142 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         return { ...s, problemIndex: nextIndex, currentProblem: null };
       }
 
-      const track = s.profile?.track ?? "addition_subtraction";
-      const problemLevel = getLevelForProblem(nextIndex, s.sessionLevel);
-      const problem = generateProblem(track, problemLevel);
+      const skill = s.activeSkillId ? SKILL_MAP[s.activeSkillId] : null;
+      if (!skill) return { ...s, problemIndex: nextIndex, currentProblem: null };
 
+      const problem = generateFromConfig(skill.problemConfig);
       return { ...s, problemIndex: nextIndex, currentProblem: problem };
     });
-  }, [getLevelForProblem]);
+  }, []);
 
   const isSessionOver = useCallback(() => {
     return state.problemIndex >= PROBLEMS_PER_SESSION;
   }, [state.problemIndex]);
 
   const syncResults = useCallback(async () => {
-    if (!state.profile || !state.progress) return;
+    if (!state.profile || !state.activeSkillId) return;
 
+    const skillId = state.activeSkillId;
+    const existing = state.skillProgressMap[skillId];
+    const currentLevel = existing?.mastery_level ?? 0;
+    const score = state.sessionScore;
+
+    // Determine new mastery level
+    let newLevel = currentLevel;
+    if (currentLevel === 0) {
+      // Any attempt -> learning
+      newLevel = 1;
+    } else if (currentLevel === 1 && score >= MASTERY_THRESHOLDS[1]) {
+      newLevel = 2;
+    } else if (currentLevel === 2 && score >= MASTERY_THRESHOLDS[2]) {
+      newLevel = 3;
+    }
+    // mastered stays mastered
+
+    const bestScore = Math.max(existing?.best_score ?? 0, score);
+    const attempts = (existing?.attempts ?? 0) + 1;
+
+    // Upsert skill_progress
+    const { data: upsertedProgress } = await supabase
+      .from("skill_progress")
+      .upsert(
+        {
+          profile_id: state.profile.id,
+          skill_id: skillId,
+          mastery_level: newLevel,
+          best_score: bestScore,
+          attempts,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "profile_id,skill_id" }
+      )
+      .select()
+      .single();
+
+    // Update streak
     const now = new Date();
-    const lastPlayed = new Date(state.progress.updated_at);
+    const lastPlayed = state.profileStats
+      ? new Date(state.profileStats.last_played_at)
+      : now;
     const daysDiff = Math.floor(
       (now.getTime() - lastPlayed.getTime()) / (1000 * 60 * 60 * 24)
     );
 
-    let newStreak = state.progress.streak;
+    let newStreak = state.profileStats?.streak ?? 0;
     if (daysDiff === 1) {
       newStreak += 1;
     } else if (daysDiff === 0) {
       // same day, keep streak
+      newStreak = Math.max(newStreak, 1);
     } else {
       newStreak = 1;
     }
 
-    const allMissed = [
-      ...state.progress.missed_problems,
-      ...state.sessionMissed,
-    ].slice(-20);
+    const totalCompleted =
+      (state.profileStats?.total_completed ?? 0) + PROBLEMS_PER_SESSION;
 
-    const updates = {
-      current_level: state.sessionLevel,
-      streak: newStreak,
-      total_completed:
-        state.progress.total_completed + PROBLEMS_PER_SESSION,
-      missed_problems: allMissed,
-      updated_at: now.toISOString(),
-    };
+    // Upsert profile_stats
+    const { data: upsertedStats } = await supabase
+      .from("profile_stats")
+      .upsert(
+        {
+          profile_id: state.profile.id,
+          streak: newStreak,
+          total_completed: totalCompleted,
+          last_played_at: now.toISOString(),
+        },
+        { onConflict: "profile_id" }
+      )
+      .select()
+      .single();
 
-    if (state.progress.id) {
-      await supabase
-        .from("progress")
-        .update(updates)
-        .eq("id", state.progress.id);
-    } else {
-      await supabase
-        .from("progress")
-        .insert({ profile_id: state.profile.id, ...updates });
-    }
+    setState((s) => {
+      const newMap = { ...s.skillProgressMap };
+      if (upsertedProgress) {
+        newMap[skillId] = upsertedProgress;
+      } else {
+        // Fallback: update locally
+        newMap[skillId] = {
+          id: existing?.id ?? "",
+          profile_id: s.profile!.id,
+          skill_id: skillId,
+          mastery_level: newLevel,
+          best_score: bestScore,
+          attempts,
+          updated_at: now.toISOString(),
+        };
+      }
 
-    setState((s) => ({
-      ...s,
-      progress: s.progress
-        ? { ...s.progress, ...updates }
-        : null,
-    }));
-  }, [state.profile, state.progress, state.sessionLevel, state.sessionMissed]);
+      return {
+        ...s,
+        skillProgressMap: newMap,
+        profileStats: upsertedStats ?? {
+          id: s.profileStats?.id ?? "",
+          profile_id: s.profile!.id,
+          streak: newStreak,
+          total_completed: totalCompleted,
+          last_played_at: now.toISOString(),
+        },
+      };
+    });
+  }, [
+    state.profile,
+    state.activeSkillId,
+    state.sessionScore,
+    state.skillProgressMap,
+    state.profileStats,
+  ]);
 
   const clearProfile = useCallback(() => {
     setState({
       profile: null,
-      progress: null,
+      profileStats: null,
+      skillProgressMap: {},
+      activeSkillId: null,
       currentProblem: null,
       problemIndex: 0,
       sessionScore: 0,
       sessionMissed: [],
-      consecutiveCorrect: 0,
-      consecutiveWrong: 0,
-      sessionLevel: 1,
     });
   }, []);
 
@@ -233,12 +316,14 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       value={{
         ...state,
         selectProfile,
-        startSession,
+        startLesson,
         submitAnswer,
         nextProblem,
         isSessionOver,
         syncResults,
         clearProfile,
+        getSkillStatus,
+        getSkillProgress,
       }}
     >
       {children}

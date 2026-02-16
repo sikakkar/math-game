@@ -9,16 +9,23 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 export type Profile = {
   id: string;
   name: string;
-  track: "addition_subtraction" | "multiplication";
   created_at: string;
 };
 
-export type Progress = {
+export type SkillProgress = {
   id: string;
   profile_id: string;
-  current_level: number;
+  skill_id: string;
+  mastery_level: number;
+  best_score: number;
+  attempts: number;
+  updated_at: string;
+};
+
+export type ProfileStats = {
+  id: string;
+  profile_id: string;
   streak: number;
   total_completed: number;
-  missed_problems: { question: string; answer: number }[];
-  updated_at: string;
+  last_played_at: string;
 };

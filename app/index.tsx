@@ -16,7 +16,6 @@ export default function ProfilePicker() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [newName, setNewName] = useState("");
-  const [newTrack, setNewTrack] = useState<Profile["track"]>("addition_subtraction");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const { selectProfile } = useGame();
   const router = useRouter();
@@ -36,21 +35,21 @@ export default function ProfilePicker() {
 
   const handlePick = async (profile: Profile) => {
     await selectProfile(profile);
-    router.push("/game");
+    router.push("/path");
   };
 
   const handleCreate = async () => {
     const trimmed = newName.trim();
     if (!trimmed) return;
-    await supabase.from("profiles").insert({ name: trimmed, track: newTrack });
+    await supabase.from("profiles").insert({ name: trimmed });
     setShowForm(false);
     setNewName("");
-    setNewTrack("addition_subtraction");
     await fetchProfiles();
   };
 
   const handleDelete = async (id: string) => {
-    await supabase.from("progress").delete().eq("profile_id", id);
+    await supabase.from("skill_progress").delete().eq("profile_id", id);
+    await supabase.from("profile_stats").delete().eq("profile_id", id);
     await supabase.from("profiles").delete().eq("id", id);
     setConfirmDeleteId(null);
     await fetchProfiles();
@@ -71,21 +70,11 @@ export default function ProfilePicker() {
         {profiles.map((p) => (
           <View key={p.id}>
             <Pressable
-              style={[
-                styles.card,
-                p.track === "multiplication"
-                  ? styles.cardOrange
-                  : styles.cardPurple,
-              ]}
+              style={[styles.card, styles.cardPurple]}
               onPress={() => handlePick(p)}
               onLongPress={() => setConfirmDeleteId(p.id)}
             >
               <Text style={styles.cardName}>{p.name}</Text>
-              <Text style={styles.cardTrack}>
-                {p.track === "multiplication"
-                  ? "Multiplication"
-                  : "Add & Subtract"}
-              </Text>
             </Pressable>
             {confirmDeleteId === p.id && (
               <View style={styles.deleteOverlay}>
@@ -119,40 +108,6 @@ export default function ProfilePicker() {
               onChangeText={setNewName}
               autoFocus
             />
-            <View style={styles.trackPicker}>
-              <Pressable
-                style={[
-                  styles.trackOption,
-                  newTrack === "addition_subtraction" && styles.trackOptionSelectedPurple,
-                ]}
-                onPress={() => setNewTrack("addition_subtraction")}
-              >
-                <Text
-                  style={[
-                    styles.trackOptionText,
-                    newTrack === "addition_subtraction" && styles.trackOptionTextSelected,
-                  ]}
-                >
-                  Add & Subtract
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.trackOption,
-                  newTrack === "multiplication" && styles.trackOptionSelectedOrange,
-                ]}
-                onPress={() => setNewTrack("multiplication")}
-              >
-                <Text
-                  style={[
-                    styles.trackOptionText,
-                    newTrack === "multiplication" && styles.trackOptionTextSelected,
-                  ]}
-                >
-                  Multiplication
-                </Text>
-              </Pressable>
-            </View>
             <View style={styles.formButtons}>
               <Pressable
                 style={[styles.btn, styles.btnCreate]}
@@ -165,7 +120,6 @@ export default function ProfilePicker() {
                 onPress={() => {
                   setShowForm(false);
                   setNewName("");
-                  setNewTrack("addition_subtraction");
                 }}
               >
                 <Text style={styles.btnText}>Cancel</Text>
@@ -212,18 +166,10 @@ const styles = StyleSheet.create({
   cardPurple: {
     backgroundColor: "#6C63FF",
   },
-  cardOrange: {
-    backgroundColor: "#FF8C42",
-  },
   cardName: {
     fontSize: 28,
     fontWeight: "700",
     color: "#fff",
-    marginBottom: 8,
-  },
-  cardTrack: {
-    fontSize: 16,
-    color: "rgba(255,255,255,0.85)",
   },
   addButton: {
     borderRadius: 20,
@@ -251,34 +197,6 @@ const styles = StyleSheet.create({
     padding: 14,
     fontSize: 18,
     color: "#1E1B4B",
-  },
-  trackPicker: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  trackOption: {
-    flex: 1,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: "#E0D8FF",
-    padding: 12,
-    alignItems: "center",
-  },
-  trackOptionSelectedPurple: {
-    backgroundColor: "#6C63FF",
-    borderColor: "#6C63FF",
-  },
-  trackOptionSelectedOrange: {
-    backgroundColor: "#FF8C42",
-    borderColor: "#FF8C42",
-  },
-  trackOptionText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#1E1B4B",
-  },
-  trackOptionTextSelected: {
-    color: "#fff",
   },
   formButtons: {
     flexDirection: "row",

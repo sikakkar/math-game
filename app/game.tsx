@@ -2,17 +2,17 @@ import { useEffect, useState, useCallback } from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import { useGame } from "../lib/context";
+import { SKILL_MAP, SKILL_SECTION_MAP } from "../lib/curriculum";
 
 type Feedback = { index: number; result: "correct" | "wrong" } | null;
 
 export default function GameScreen() {
   const {
     profile,
+    activeSkillId,
     currentProblem,
     problemIndex,
     sessionScore,
-    sessionLevel,
-    startSession,
     submitAnswer,
     nextProblem,
     isSessionOver,
@@ -20,9 +20,12 @@ export default function GameScreen() {
   const router = useRouter();
   const [feedback, setFeedback] = useState<Feedback>(null);
 
+  // Guard: if no active skill, redirect to path
   useEffect(() => {
-    startSession();
-  }, [startSession]);
+    if (!activeSkillId || !profile) {
+      router.replace("/path");
+    }
+  }, [activeSkillId, profile, router]);
 
   const handleChoice = useCallback(
     (choice: number, choiceIndex: number) => {
@@ -45,15 +48,18 @@ export default function GameScreen() {
     }
   }, [problemIndex, isSessionOver, router]);
 
-  if (!currentProblem || !profile) return null;
+  if (!currentProblem || !profile || !activeSkillId) return null;
 
-  const trackColor =
-    profile.track === "multiplication" ? "#FF8C42" : "#6C63FF";
+  const skill = SKILL_MAP[activeSkillId];
+  const section = SKILL_SECTION_MAP[activeSkillId];
+  const sectionColor = section?.color ?? "#6C63FF";
 
   return (
     <View style={styles.container}>
       <View style={styles.topBar}>
-        <Text style={styles.topText}>Level {sessionLevel}</Text>
+        <Text style={[styles.topText, { color: sectionColor }]}>
+          {skill?.name ?? "Practice"}
+        </Text>
         <Text style={styles.topText}>
           {problemIndex + 1} / 10
         </Text>
@@ -68,7 +74,7 @@ export default function GameScreen() {
 
       <View style={styles.choicesGrid}>
         {currentProblem.choices.map((choice, i) => {
-          let bgColor = trackColor;
+          let bgColor = sectionColor;
           if (feedback) {
             if (feedback.index === i) {
               bgColor = feedback.result === "correct" ? "#22C55E" : "#EF4444";
