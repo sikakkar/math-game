@@ -6,6 +6,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   TextInput,
+  Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { supabase, type Profile } from "../lib/supabase";
@@ -65,6 +66,10 @@ export default function ProfilePicker() {
 
   return (
     <View style={styles.container}>
+      <Image
+        source={require("../assets/orca/greeting.png")}
+        style={styles.orca}
+      />
       <Text style={styles.title}>Who's playing?</Text>
       <View style={styles.cards}>
         {profiles.map((p) => (
@@ -146,6 +151,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: 32,
+  },
+  orca: {
+    width: 150,
+    height: 150,
+    marginBottom: 16,
   },
   title: {
     fontSize: 36,

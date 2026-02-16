@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { View, Text, Pressable, StyleSheet } from "react-native";
+import { View, Text, Pressable, StyleSheet, Image } from "react-native";
 import { useRouter } from "expo-router";
 import { useGame } from "../lib/context";
 import { SKILL_MAP, SKILL_SECTION_MAP } from "../lib/curriculum";
@@ -69,6 +69,10 @@ export default function GameScreen() {
       </View>
 
       <View style={styles.questionArea}>
+        <Image
+          source={require("../assets/orca/thinking.png")}
+          style={styles.orca}
+        />
         <Text style={styles.question}>{currentProblem.question} = ?</Text>
       </View>
 
@@ -118,6 +122,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#6B7280",
+  },
+  orca: {
+    width: 80,
+    height: 80,
+    marginBottom: 16,
   },
   questionArea: {
     flex: 1,

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { View, Text, Pressable, StyleSheet, ScrollView } from "react-native";
+import { View, Text, Pressable, StyleSheet, ScrollView, Image } from "react-native";
 import { useRouter } from "expo-router";
 import { useGame } from "../lib/context";
 import { SKILL_MAP, SKILL_SECTION_MAP, MASTERY_THRESHOLDS } from "../lib/curriculum";
@@ -69,6 +69,15 @@ export default function ResultsScreen() {
       contentContainerStyle={styles.container}
       bounces={false}
     >
+      <Image
+        source={
+          sessionScore >= 8
+            ? require("../assets/orca/celebrating.png")
+            : require("../assets/orca/encouraging.png")
+        }
+        style={styles.orca}
+      />
+
       <Text style={styles.stars}>{starDisplay}</Text>
 
       {skill && (
@@ -159,6 +168,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: 32,
+  },
+  orca: {
+    width: 120,
+    height: 120,
+    marginBottom: 12,
   },
   stars: {
     fontSize: 56,

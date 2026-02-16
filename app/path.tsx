@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { View, Text, Pressable, StyleSheet, ScrollView } from "react-native";
+import { View, Text, Pressable, StyleSheet, ScrollView, Image } from "react-native";
 import { useRouter } from "expo-router";
 import { useGame, type SkillStatus } from "../lib/context";
 import { CURRICULUM, type Section, type Skill } from "../lib/curriculum";
@@ -132,6 +132,12 @@ export default function PathScreen() {
                         {status === "locked" ? "🔒" : skill.icon}
                       </Text>
                     </Pressable>
+                    {isPlayable && (
+                      <Image
+                        source={require("../assets/orca/pointing.png")}
+                        style={styles.orcaPointing}
+                      />
+                    )}
 
                     <View style={styles.masteryDots}>
                       {[1, 2, 3].map((level) => (
@@ -251,6 +257,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 28,
     width: 90,
+  },
+  orcaPointing: {
+    width: 60,
+    height: 60,
+    position: "absolute",
+    right: -55,
+    top: 5,
   },
   node: {
     width: 70,
