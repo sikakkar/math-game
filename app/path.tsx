@@ -1,8 +1,14 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useMemo } from "react";
 import { View, Text, Pressable, StyleSheet, ScrollView, Image } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, Redirect } from "expo-router";
 import { useGame, type SkillStatus } from "../lib/context";
 import { CURRICULUM, type Section, type Skill } from "../lib/curriculum";
+
+const POINTING_IMAGES = [
+  require("../assets/orca/pointing.png"),
+  require("../assets/orca/pointing_excited.png"),
+  require("../assets/orca/pointing_wand.png"),
+];
 
 export default function PathScreen() {
   const {
@@ -18,11 +24,10 @@ export default function PathScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const firstAvailableY = useRef<number | null>(null);
 
-  useEffect(() => {
-    if (!profile) {
-      router.replace("/");
-    }
-  }, [profile, router]);
+  const pointingImage = useMemo(
+    () => POINTING_IMAGES[Math.floor(Math.random() * POINTING_IMAGES.length)],
+    []
+  );
 
   // Auto-scroll to first available/in-progress skill
   useEffect(() => {
@@ -37,7 +42,7 @@ export default function PathScreen() {
     return () => clearTimeout(timer);
   }, []);
 
-  if (!profile) return null;
+  if (!profile) return <Redirect href="/" />;
 
   const playableId = getPlayableSkillId();
 
@@ -134,7 +139,7 @@ export default function PathScreen() {
                     </Pressable>
                     {isPlayable && (
                       <Image
-                        source={require("../assets/orca/pointing.png")}
+                        source={pointingImage}
                         style={styles.orcaPointing}
                       />
                     )}

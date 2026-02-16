@@ -1,8 +1,20 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { View, Text, Pressable, StyleSheet, ScrollView, Image } from "react-native";
 import { useRouter } from "expo-router";
 import { useGame } from "../lib/context";
 import { SKILL_MAP, SKILL_SECTION_MAP, MASTERY_THRESHOLDS } from "../lib/curriculum";
+
+const CELEBRATING_IMAGES = [
+  require("../assets/orca/celebrating.png"),
+  require("../assets/orca/celebrating_trophy.png"),
+  require("../assets/orca/celebrating_fireworks.png"),
+];
+
+const ENCOURAGING_IMAGES = [
+  require("../assets/orca/encouraging.png"),
+  require("../assets/orca/encouraging_flex.png"),
+  require("../assets/orca/encouraging_heart.png"),
+];
 
 const MASTERY_LABELS: Record<number, string> = {
   0: "Not Started",
@@ -25,6 +37,11 @@ export default function ResultsScreen() {
   const router = useRouter();
   const [synced, setSynced] = useState(false);
   const [prevLevel, setPrevLevel] = useState<number | null>(null);
+
+  const orcaImage = useMemo(() => {
+    const pool = sessionScore >= 8 ? CELEBRATING_IMAGES : ENCOURAGING_IMAGES;
+    return pool[Math.floor(Math.random() * pool.length)];
+  }, [sessionScore]);
 
   useEffect(() => {
     if (!synced && activeSkillId) {
@@ -69,14 +86,7 @@ export default function ResultsScreen() {
       contentContainerStyle={styles.container}
       bounces={false}
     >
-      <Image
-        source={
-          sessionScore >= 8
-            ? require("../assets/orca/celebrating.png")
-            : require("../assets/orca/encouraging.png")
-        }
-        style={styles.orca}
-      />
+      <Image source={orcaImage} style={styles.orca} />
 
       <Text style={styles.stars}>{starDisplay}</Text>
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -7,10 +7,17 @@ import {
   ActivityIndicator,
   TextInput,
   Image,
+  ScrollView,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { supabase, type Profile } from "../lib/supabase";
 import { useGame } from "../lib/context";
+
+const GREETING_IMAGES = [
+  require("../assets/orca/greeting.png"),
+  require("../assets/orca/greeting_peek.png"),
+  require("../assets/orca/greeting_bow.png"),
+];
 
 export default function ProfilePicker() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -20,6 +27,11 @@ export default function ProfilePicker() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const { selectProfile } = useGame();
   const router = useRouter();
+
+  const orcaImage = useMemo(
+    () => GREETING_IMAGES[Math.floor(Math.random() * GREETING_IMAGES.length)],
+    []
+  );
 
   const fetchProfiles = async () => {
     const { data } = await supabase
@@ -65,11 +77,11 @@ export default function ProfilePicker() {
   }
 
   return (
-    <View style={styles.container}>
-      <Image
-        source={require("../assets/orca/greeting.png")}
-        style={styles.orca}
-      />
+    <ScrollView
+      contentContainerStyle={styles.container}
+      bounces={false}
+    >
+      <Image source={orcaImage} style={styles.orca} />
       <Text style={styles.title}>Who's playing?</Text>
       <View style={styles.cards}>
         {profiles.map((p) => (
@@ -140,22 +152,22 @@ export default function ProfilePicker() {
           </Pressable>
         )}
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flexGrow: 1,
     backgroundColor: "#F5F3FF",
     justifyContent: "center",
     alignItems: "center",
     padding: 32,
   },
   orca: {
-    width: 150,
-    height: 150,
-    marginBottom: 16,
+    width: 120,
+    height: 120,
+    marginBottom: 12,
   },
   title: {
     fontSize: 36,
