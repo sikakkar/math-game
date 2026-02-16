@@ -19,8 +19,8 @@ export default function ResultsScreen() {
     profileStats,
     syncResults,
     startLesson,
-    clearProfile,
     getSkillProgress,
+    getPlayableSkillId,
   } = useGame();
   const router = useRouter();
   const [synced, setSynced] = useState(false);
@@ -50,8 +50,11 @@ export default function ResultsScreen() {
     .map((_, i) => (i < stars ? "\u2605" : "\u2606"))
     .join(" ");
 
+  const playableId = synced ? getPlayableSkillId() : null;
+  const canPracticeAgain = synced && activeSkillId === playableId;
+
   const handlePracticeAgain = () => {
-    if (activeSkillId) {
+    if (activeSkillId && canPracticeAgain) {
       startLesson(activeSkillId);
       router.replace("/game");
     }
@@ -128,18 +131,20 @@ export default function ResultsScreen() {
       )}
 
       <View style={styles.buttons}>
+        {canPracticeAgain && (
+          <Pressable
+            style={[styles.button, { backgroundColor: sectionColor }]}
+            onPress={handlePracticeAgain}
+          >
+            <Text style={styles.buttonText}>Practice Again</Text>
+          </Pressable>
+        )}
         <Pressable
-          style={[styles.button, { backgroundColor: sectionColor }]}
-          onPress={handlePracticeAgain}
-        >
-          <Text style={styles.buttonText}>Practice Again</Text>
-        </Pressable>
-        <Pressable
-          style={[styles.button, styles.buttonOutline]}
+          style={[styles.button, canPracticeAgain ? styles.buttonOutline : { backgroundColor: sectionColor }]}
           onPress={handleBackToPath}
         >
-          <Text style={[styles.buttonText, { color: "#6B7280" }]}>
-            Back to Path
+          <Text style={[styles.buttonText, canPracticeAgain ? { color: "#6B7280" } : undefined]}>
+            {canPracticeAgain ? "Back to Path" : "Continue"}
           </Text>
         </Pressable>
       </View>

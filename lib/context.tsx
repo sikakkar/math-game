@@ -39,6 +39,7 @@ type GameContextType = GameState & {
   clearProfile: () => void;
   getSkillStatus: (skillId: string) => SkillStatus;
   getSkillProgress: (skillId: string) => SkillProgress | null;
+  getPlayableSkillId: () => string | null;
 };
 
 const PROBLEMS_PER_SESSION = 10;
@@ -125,6 +126,19 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     },
     [state.skillProgressMap]
   );
+
+  const getPlayableSkillId = useCallback((): string | null => {
+    // The playable skill is the most advanced non-locked, non-mastered skill.
+    // Kids must work at their current level — no going back to easier stuff.
+    let playable: string | null = null;
+    for (const skill of ALL_SKILLS) {
+      const status = getSkillStatus(skill.id);
+      if (status === "available" || status === "learning" || status === "practicing") {
+        playable = skill.id;
+      }
+    }
+    return playable;
+  }, [getSkillStatus]);
 
   const startLesson = useCallback((skillId: string) => {
     const skill = SKILL_MAP[skillId];
@@ -324,6 +338,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         clearProfile,
         getSkillStatus,
         getSkillProgress,
+        getPlayableSkillId,
       }}
     >
       {children}

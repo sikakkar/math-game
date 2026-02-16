@@ -11,6 +11,7 @@ export default function PathScreen() {
     startLesson,
     getSkillStatus,
     getSkillProgress,
+    getPlayableSkillId,
     clearProfile,
   } = useGame();
   const router = useRouter();
@@ -38,9 +39,10 @@ export default function PathScreen() {
 
   if (!profile) return null;
 
+  const playableId = getPlayableSkillId();
+
   const handleNodePress = (skill: Skill) => {
-    const status = getSkillStatus(skill.id);
-    if (status === "locked") return;
+    if (skill.id !== playableId) return;
     startLesson(skill.id);
     router.push("/game");
   };
@@ -90,9 +92,11 @@ export default function PathScreen() {
                 const xOffset =
                   Math.sin((nodeIndex * Math.PI) / 2) * 80;
 
-                // Track first available node for auto-scroll
+                const isPlayable = skill.id === playableId;
+
+                // Track playable node for auto-scroll
                 const isFirstAvailable =
-                  (status === "available" || status === "learning") &&
+                  isPlayable &&
                   firstAvailableY.current === null;
 
                 return (
@@ -114,10 +118,10 @@ export default function PathScreen() {
                     <Pressable
                       style={[
                         styles.node,
-                        getNodeStyle(status, section.color),
+                        getNodeStyle(status, section.color, isPlayable),
                       ]}
                       onPress={() => handleNodePress(skill)}
-                      disabled={status === "locked"}
+                      disabled={!isPlayable}
                     >
                       <Text
                         style={[
@@ -166,25 +170,34 @@ export default function PathScreen() {
 
 function getNodeStyle(
   status: SkillStatus,
-  sectionColor: string
+  sectionColor: string,
+  isPlayable: boolean
 ) {
-  switch (status) {
-    case "locked":
-      return { backgroundColor: "#D1D5DB", borderColor: "#9CA3AF" };
-    case "available":
-      return {
-        backgroundColor: sectionColor,
-        borderColor: sectionColor,
-      };
-    case "learning":
-    case "practicing":
-    case "mastered":
-      return {
-        backgroundColor: sectionColor,
-        borderColor: "#FBBF24",
-        borderWidth: 3,
-      };
+  if (status === "locked") {
+    return { backgroundColor: "#D1D5DB", borderColor: "#9CA3AF" };
   }
+  if (isPlayable) {
+    return {
+      backgroundColor: sectionColor,
+      borderColor: "#FBBF24",
+      borderWidth: 3,
+    };
+  }
+  // Completed / passed nodes — dimmed with checkmark-style gold border
+  if (status === "mastered") {
+    return {
+      backgroundColor: sectionColor,
+      borderColor: "#FBBF24",
+      borderWidth: 3,
+      opacity: 0.5,
+    };
+  }
+  // Earlier non-mastered skills the kid has moved past
+  return {
+    backgroundColor: sectionColor,
+    borderColor: sectionColor,
+    opacity: 0.5,
+  };
 }
 
 const styles = StyleSheet.create({
