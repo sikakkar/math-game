@@ -86,7 +86,7 @@ export default function ResultsScreen() {
       contentContainerStyle={styles.container}
       bounces={false}
     >
-      <Image source={orcaImage} style={styles.orca} />
+      <Image source={orcaImage} style={styles.orca} resizeMode="contain" />
 
       <Text style={styles.stars}>{starDisplay}</Text>
 
@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
     padding: 32,
   },
   orca: {
-    width: 120,
+    width: 200,
     height: 120,
     marginBottom: 12,
   },

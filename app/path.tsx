@@ -141,6 +141,7 @@ export default function PathScreen() {
                       <Image
                         source={pointingImage}
                         style={styles.orcaPointing}
+                        resizeMode="contain"
                       />
                     )}
 
@@ -264,10 +265,10 @@ const styles = StyleSheet.create({
     width: 90,
   },
   orcaPointing: {
-    width: 60,
-    height: 60,
+    width: 70,
+    height: 50,
     position: "absolute",
-    right: -55,
+    right: -65,
     top: 5,
   },
   node: {

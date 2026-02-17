@@ -101,7 +101,7 @@ export default function GameScreen() {
       </View>
 
       <View style={styles.questionArea}>
-        <Image source={orcaSource} style={styles.orca} />
+        <Image source={orcaSource} style={styles.orca} resizeMode="contain" />
         <Text style={styles.question}>{currentProblem.question} = ?</Text>
       </View>
 
@@ -153,8 +153,8 @@ const styles = StyleSheet.create({
     color: "#6B7280",
   },
   orca: {
-    width: 80,
-    height: 80,
+    width: 150,
+    height: 100,
     marginBottom: 16,
   },
   questionArea: {
