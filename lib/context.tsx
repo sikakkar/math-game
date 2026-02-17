@@ -1,6 +1,12 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
 import { supabase, type Profile, type SkillProgress, type ProfileStats } from "./supabase";
-import { generateFromConfig, type Problem } from "./problems";
+import {
+  generateForSlot,
+  generateSessionPlan,
+  evaluateEquation,
+  type Problem,
+  type SessionSlotKind,
+} from "./problems";
 import {
   SKILL_MAP,
   SKILL_SECTION_MAP,
@@ -9,7 +15,18 @@ import {
   type Skill,
 } from "./curriculum";
 
-type MissedProblem = { question: string; answer: number };
+// --- Submit payload discriminated union ---
+
+export type SubmitPayload =
+  | { kind: "multiple_choice"; choice: number }
+  | { kind: "comparison"; choice: "A" | "B" }
+  | { kind: "bubble_pop"; selectedIndices: number[] }
+  | { kind: "equation_builder"; arrangedTiles: string[] }
+  | { kind: "ordering"; selectedOrder: number[] };
+
+// --- Generalized missed problem ---
+
+export type MissedProblem = { description: string; answer: string };
 
 export type SkillStatus =
   | "locked"
@@ -27,12 +44,13 @@ type GameState = {
   problemIndex: number;
   sessionScore: number;
   sessionMissed: MissedProblem[];
+  sessionPlan: SessionSlotKind[];
 };
 
 type GameContextType = GameState & {
   selectProfile: (profile: Profile) => Promise<void>;
   startLesson: (skillId: string) => void;
-  submitAnswer: (choice: number) => "correct" | "wrong";
+  submitAnswer: (payload: SubmitPayload) => "correct" | "wrong";
   nextProblem: () => void;
   isSessionOver: () => boolean;
   syncResults: () => Promise<void>;
@@ -46,6 +64,42 @@ const PROBLEMS_PER_SESSION = 10;
 
 const GameContext = createContext<GameContextType | null>(null);
 
+/** Check if an answer is correct for a given problem and payload */
+function checkAnswer(problem: Problem, payload: SubmitPayload): { correct: boolean; description: string; answerStr: string } {
+  switch (problem.kind) {
+    case "multiple_choice": {
+      if (payload.kind !== "multiple_choice") return { correct: false, description: problem.question, answerStr: String(problem.answer) };
+      const correct = payload.choice === problem.answer;
+      return { correct, description: problem.question, answerStr: String(problem.answer) };
+    }
+    case "comparison": {
+      if (payload.kind !== "comparison") return { correct: false, description: `${problem.expressionA} vs ${problem.expressionB}`, answerStr: problem.answer === "A" ? problem.expressionA : problem.expressionB };
+      const correct = payload.choice === problem.answer;
+      const answerExpr = problem.answer === "A" ? `${problem.expressionA} (=${problem.valueA})` : `${problem.expressionB} (=${problem.valueB})`;
+      return { correct, description: `Which is bigger: ${problem.expressionA} or ${problem.expressionB}?`, answerStr: answerExpr };
+    }
+    case "bubble_pop": {
+      if (payload.kind !== "bubble_pop") return { correct: false, description: `Tap all equal to ${problem.targetValue}`, answerStr: problem.correctIndices.map(i => problem.bubbles[i]).join(", ") };
+      // Must select exactly the right set
+      const selectedSet = new Set(payload.selectedIndices);
+      const correctSet = new Set(problem.correctIndices);
+      const correct = selectedSet.size === correctSet.size && [...correctSet].every(i => selectedSet.has(i));
+      return { correct, description: `Tap all equal to ${problem.targetValue}`, answerStr: problem.correctIndices.map(i => problem.bubbles[i]).join(", ") };
+    }
+    case "equation_builder": {
+      if (payload.kind !== "equation_builder") return { correct: false, description: "Build the equation", answerStr: problem.correctOrder.join(" ") };
+      const correct = evaluateEquation(payload.arrangedTiles);
+      return { correct, description: "Build the equation", answerStr: problem.correctOrder.join(" ") };
+    }
+    case "ordering": {
+      if (payload.kind !== "ordering") return { correct: false, description: "Order smallest to biggest", answerStr: problem.correctOrder.map(i => problem.items[i]).join(", ") };
+      const correct = payload.selectedOrder.length === problem.correctOrder.length &&
+        payload.selectedOrder.every((val, idx) => val === problem.correctOrder[idx]);
+      return { correct, description: "Order smallest to biggest", answerStr: problem.correctOrder.map(i => problem.items[i]).join(", ") };
+    }
+  }
+}
+
 export function GameProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<GameState>({
     profile: null,
@@ -56,10 +110,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     problemIndex: 0,
     sessionScore: 0,
     sessionMissed: [],
+    sessionPlan: [],
   });
 
   const selectProfile = useCallback(async (profile: Profile) => {
-    // Fetch all skill progress for this profile
     const { data: progressData } = await supabase
       .from("skill_progress")
       .select("*")
@@ -70,7 +124,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       skillProgressMap[sp.skill_id] = sp;
     }
 
-    // Fetch profile stats
     const { data: statsData } = await supabase
       .from("profile_stats")
       .select("*")
@@ -100,14 +153,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
       const progress = state.skillProgressMap[skillId];
 
-      // If has progress, return based on mastery level
       if (progress && progress.mastery_level > 0) {
         if (progress.mastery_level >= 3) return "mastered";
         if (progress.mastery_level >= 2) return "practicing";
         return "learning";
       }
 
-      // Check prerequisite
       if (!skill.prerequisite) return "available";
 
       const prereqProgress = state.skillProgressMap[skill.prerequisite];
@@ -128,8 +179,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   );
 
   const getPlayableSkillId = useCallback((): string | null => {
-    // The playable skill is the most advanced non-locked, non-mastered skill.
-    // Kids must work at their current level — no going back to easier stuff.
     let playable: string | null = null;
     for (const skill of ALL_SKILLS) {
       const status = getSkillStatus(skill.id);
@@ -144,7 +193,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     const skill = SKILL_MAP[skillId];
     if (!skill) return;
 
-    const problem = generateFromConfig(skill.problemConfig);
+    const plan = generateSessionPlan();
+    const problem = generateForSlot(plan[0], skill.problemConfig);
 
     setState((s) => ({
       ...s,
@@ -152,29 +202,30 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       problemIndex: 0,
       sessionScore: 0,
       sessionMissed: [],
+      sessionPlan: plan,
       currentProblem: problem,
     }));
   }, []);
 
   const submitAnswer = useCallback(
-    (choice: number): "correct" | "wrong" => {
+    (payload: SubmitPayload): "correct" | "wrong" => {
       const problem = state.currentProblem;
       if (!problem) return "wrong";
 
-      const isCorrect = choice === problem.answer;
+      const { correct, description, answerStr } = checkAnswer(problem, payload);
 
       setState((s) => ({
         ...s,
-        sessionScore: isCorrect ? s.sessionScore + 1 : s.sessionScore,
-        sessionMissed: isCorrect
+        sessionScore: correct ? s.sessionScore + 1 : s.sessionScore,
+        sessionMissed: correct
           ? s.sessionMissed
           : [
               ...s.sessionMissed,
-              { question: problem.question, answer: problem.answer },
+              { description, answer: answerStr },
             ],
       }));
 
-      return isCorrect ? "correct" : "wrong";
+      return correct ? "correct" : "wrong";
     },
     [state.currentProblem]
   );
@@ -189,7 +240,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       const skill = s.activeSkillId ? SKILL_MAP[s.activeSkillId] : null;
       if (!skill) return { ...s, problemIndex: nextIndex, currentProblem: null };
 
-      const problem = generateFromConfig(skill.problemConfig);
+      const slotKind = s.sessionPlan[nextIndex] ?? "multiple_choice";
+      const problem = generateForSlot(slotKind, skill.problemConfig);
       return { ...s, problemIndex: nextIndex, currentProblem: problem };
     });
   }, []);
@@ -206,22 +258,18 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     const currentLevel = existing?.mastery_level ?? 0;
     const score = state.sessionScore;
 
-    // Determine new mastery level
     let newLevel = currentLevel;
     if (currentLevel === 0) {
-      // Any attempt -> learning
       newLevel = 1;
     } else if (currentLevel === 1 && score >= MASTERY_THRESHOLDS[1]) {
       newLevel = 2;
     } else if (currentLevel === 2 && score >= MASTERY_THRESHOLDS[2]) {
       newLevel = 3;
     }
-    // mastered stays mastered
 
     const bestScore = Math.max(existing?.best_score ?? 0, score);
     const attempts = (existing?.attempts ?? 0) + 1;
 
-    // Upsert skill_progress
     const { data: upsertedProgress } = await supabase
       .from("skill_progress")
       .upsert(
@@ -238,7 +286,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       .select()
       .single();
 
-    // Update streak
     const now = new Date();
     const lastPlayed = state.profileStats
       ? new Date(state.profileStats.last_played_at)
@@ -251,7 +298,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (daysDiff === 1) {
       newStreak += 1;
     } else if (daysDiff === 0) {
-      // same day, keep streak
       newStreak = Math.max(newStreak, 1);
     } else {
       newStreak = 1;
@@ -260,7 +306,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     const totalCompleted =
       (state.profileStats?.total_completed ?? 0) + PROBLEMS_PER_SESSION;
 
-    // Upsert profile_stats
     const { data: upsertedStats } = await supabase
       .from("profile_stats")
       .upsert(
@@ -280,7 +325,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       if (upsertedProgress) {
         newMap[skillId] = upsertedProgress;
       } else {
-        // Fallback: update locally
         newMap[skillId] = {
           id: existing?.id ?? "",
           profile_id: s.profile!.id,
@@ -322,6 +366,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       problemIndex: 0,
       sessionScore: 0,
       sessionMissed: [],
+      sessionPlan: [],
     });
   }, []);
 

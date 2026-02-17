@@ -143,7 +143,7 @@ export default function ResultsScreen() {
           <Text style={styles.missedTitle}>Review these:</Text>
           {sessionMissed.map((m, i) => (
             <Text key={i} style={styles.missedItem}>
-              {m.question} = {m.answer}
+              {m.description} → {m.answer}
             </Text>
           ))}
         </View>

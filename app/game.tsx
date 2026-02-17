@@ -1,10 +1,23 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { View, Text, Pressable, StyleSheet, Image } from "react-native";
+import { View, Text, StyleSheet, Image } from "react-native";
 import { useRouter, Redirect } from "expo-router";
-import { useGame } from "../lib/context";
+import { useGame, type SubmitPayload } from "../lib/context";
 import { SKILL_MAP, SKILL_SECTION_MAP } from "../lib/curriculum";
+import type { Problem } from "../lib/problems";
 
-type Feedback = { index: number; result: "correct" | "wrong" } | null;
+import MultipleChoiceView from "./components/MultipleChoiceView";
+import ComparisonView from "./components/ComparisonView";
+import BubblePopView from "./components/BubblePopView";
+import EquationBuilderView from "./components/EquationBuilderView";
+import OrderingView from "./components/OrderingView";
+
+type FeedbackState =
+  | { kind: "multiple_choice"; index: number; result: "correct" | "wrong" }
+  | { kind: "comparison"; choice: "A" | "B"; result: "correct" | "wrong" }
+  | { kind: "bubble_pop"; result: "correct" | "wrong" }
+  | { kind: "equation_builder"; result: "correct" | "wrong" }
+  | { kind: "ordering"; result: "correct" | "wrong" }
+  | null;
 
 const THINKING_IMAGES = [
   require("../assets/orca/thinking.png"),
@@ -42,21 +55,41 @@ export default function GameScreen() {
     isSessionOver,
   } = useGame();
   const router = useRouter();
-  const [feedback, setFeedback] = useState<Feedback>(null);
+  const [feedback, setFeedback] = useState<FeedbackState>(null);
   const [reactionImage, setReactionImage] = useState<any>(null);
 
-  // Pick a new thinking image each problem
   const thinkingImage = useMemo(
     () => pickRandom(THINKING_IMAGES),
     [problemIndex]
   );
 
-  const handleChoice = useCallback(
-    (choice: number, choiceIndex: number) => {
-      if (feedback) return; // prevent double tap
+  const handleSubmit = useCallback(
+    (payload: SubmitPayload, feedbackMeta: any) => {
+      if (feedback) return;
 
-      const result = submitAnswer(choice);
-      setFeedback({ index: choiceIndex, result });
+      const result = submitAnswer(payload);
+
+      // Build feedback state based on problem kind
+      let fb: FeedbackState;
+      switch (payload.kind) {
+        case "multiple_choice":
+          fb = { kind: "multiple_choice", index: feedbackMeta.index, result };
+          break;
+        case "comparison":
+          fb = { kind: "comparison", choice: feedbackMeta.choice, result };
+          break;
+        case "bubble_pop":
+          fb = { kind: "bubble_pop", result };
+          break;
+        case "equation_builder":
+          fb = { kind: "equation_builder", result };
+          break;
+        case "ordering":
+          fb = { kind: "ordering", result };
+          break;
+      }
+
+      setFeedback(fb);
       setReactionImage(
         result === "correct" ? pickRandom(CORRECT_IMAGES) : pickRandom(WRONG_IMAGES)
       );
@@ -76,7 +109,6 @@ export default function GameScreen() {
     }
   }, [problemIndex, isSessionOver, router]);
 
-  // Guard: redirect if no active session (handles direct URL access)
   if (!activeSkillId || !profile) return <Redirect href="/path" />;
   if (!currentProblem) return null;
 
@@ -102,37 +134,75 @@ export default function GameScreen() {
 
       <View style={styles.questionArea}>
         <Image source={orcaSource} style={styles.orca} resizeMode="contain" />
-        <Text style={styles.question}>{currentProblem.question} = ?</Text>
-      </View>
-
-      <View style={styles.choicesGrid}>
-        {currentProblem.choices.map((choice, i) => {
-          let bgColor = sectionColor;
-          if (feedback) {
-            if (feedback.index === i) {
-              bgColor = feedback.result === "correct" ? "#22C55E" : "#EF4444";
-            } else if (
-              feedback.result === "wrong" &&
-              choice === currentProblem.answer
-            ) {
-              bgColor = "#22C55E";
-            }
-          }
-
-          return (
-            <Pressable
-              key={i}
-              style={[styles.choiceButton, { backgroundColor: bgColor }]}
-              onPress={() => handleChoice(choice, i)}
-              disabled={feedback !== null}
-            >
-              <Text style={styles.choiceText}>{choice}</Text>
-            </Pressable>
-          );
-        })}
+        <ProblemView
+          problem={currentProblem}
+          sectionColor={sectionColor}
+          feedback={feedback}
+          onSubmit={handleSubmit}
+        />
       </View>
     </View>
   );
+}
+
+function ProblemView({
+  problem,
+  sectionColor,
+  feedback,
+  onSubmit,
+}: {
+  problem: Problem;
+  sectionColor: string;
+  feedback: FeedbackState;
+  onSubmit: (payload: SubmitPayload, feedbackMeta: any) => void;
+}) {
+  switch (problem.kind) {
+    case "multiple_choice":
+      return (
+        <MultipleChoiceView
+          problem={problem}
+          sectionColor={sectionColor}
+          feedback={feedback?.kind === "multiple_choice" ? feedback : null}
+          onSubmit={onSubmit}
+        />
+      );
+    case "comparison":
+      return (
+        <ComparisonView
+          problem={problem}
+          sectionColor={sectionColor}
+          feedback={feedback?.kind === "comparison" ? feedback : null}
+          onSubmit={onSubmit}
+        />
+      );
+    case "bubble_pop":
+      return (
+        <BubblePopView
+          problem={problem}
+          sectionColor={sectionColor}
+          feedback={feedback?.kind === "bubble_pop" ? feedback : null}
+          onSubmit={onSubmit}
+        />
+      );
+    case "equation_builder":
+      return (
+        <EquationBuilderView
+          problem={problem}
+          sectionColor={sectionColor}
+          feedback={feedback?.kind === "equation_builder" ? feedback : null}
+          onSubmit={onSubmit}
+        />
+      );
+    case "ordering":
+      return (
+        <OrderingView
+          problem={problem}
+          sectionColor={sectionColor}
+          feedback={feedback?.kind === "ordering" ? feedback : null}
+          onSubmit={onSubmit}
+        />
+      );
+  }
 }
 
 const styles = StyleSheet.create({
@@ -161,28 +231,5 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-  },
-  question: {
-    fontSize: 56,
-    fontWeight: "700",
-    color: "#1E1B4B",
-  },
-  choicesGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 16,
-    justifyContent: "center",
-    paddingBottom: 60,
-  },
-  choiceButton: {
-    width: "45%",
-    paddingVertical: 24,
-    borderRadius: 16,
-    alignItems: "center",
-  },
-  choiceText: {
-    fontSize: 32,
-    fontWeight: "700",
-    color: "#fff",
   },
 });
