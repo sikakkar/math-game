@@ -1,5 +1,5 @@
 import { useEffect, useRef, useMemo } from "react";
-import { View, Text, Pressable, StyleSheet, ScrollView, Image } from "react-native";
+import { View, Text, Pressable, StyleSheet, ScrollView, Image, Platform } from "react-native";
 import { useRouter, Redirect } from "expo-router";
 import { useGame, type SkillStatus } from "../lib/context";
 import { CURRICULUM, type Section, type Skill } from "../lib/curriculum";
@@ -22,25 +22,38 @@ export default function PathScreen() {
   } = useGame();
   const router = useRouter();
   const scrollRef = useRef<ScrollView>(null);
-  const firstAvailableY = useRef<number | null>(null);
 
   const pointingImage = useMemo(
     () => POINTING_IMAGES[Math.floor(Math.random() * POINTING_IMAGES.length)],
     []
   );
 
-  // Auto-scroll to first available/in-progress skill
+  // Scroll the playable skill into view after mount
   useEffect(() => {
+    if (Platform.OS !== "web") return;
     const timer = setTimeout(() => {
-      if (firstAvailableY.current !== null && scrollRef.current) {
-        scrollRef.current.scrollTo({
-          y: Math.max(0, firstAvailableY.current - 200),
-          animated: true,
-        });
+      const el = document.getElementById("playable-skill");
+      if (!el) return;
+
+      // Walk up to find the scrollable ancestor (RN Web ScrollView)
+      let scrollable: HTMLElement | null = el.parentElement;
+      while (scrollable) {
+        const style = window.getComputedStyle(scrollable);
+        if (
+          (style.overflowY === "auto" || style.overflowY === "scroll") &&
+          scrollable.scrollHeight > scrollable.clientHeight
+        ) break;
+        scrollable = scrollable.parentElement;
       }
-    }, 100);
+      if (!scrollable) return;
+
+      const elRect = el.getBoundingClientRect();
+      const scrollRect = scrollable.getBoundingClientRect();
+      const offsetInContent = elRect.top - scrollRect.top + scrollable.scrollTop;
+      scrollable.scrollTop = Math.max(0, offsetInContent - scrollable.clientHeight / 2);
+    }, 300);
     return () => clearTimeout(timer);
-  }, []);
+  }, [profile]);
 
   if (!profile) return <Redirect href="/" />;
 
@@ -99,26 +112,14 @@ export default function PathScreen() {
 
                 const isPlayable = skill.id === playableId;
 
-                // Track playable node for auto-scroll
-                const isFirstAvailable =
-                  isPlayable &&
-                  firstAvailableY.current === null;
-
                 return (
                   <View
                     key={skill.id}
+                    nativeID={isPlayable ? "playable-skill" : undefined}
                     style={[
                       styles.nodeRow,
                       { marginLeft: xOffset + 80 },
                     ]}
-                    onLayout={
-                      isFirstAvailable
-                        ? (e) => {
-                            firstAvailableY.current =
-                              e.nativeEvent.layout.y;
-                          }
-                        : undefined
-                    }
                   >
                     <Pressable
                       style={[
