@@ -1,0 +1,14 @@
+- generic [ref=e509]:
+  - generic [ref=e510]:
+    - generic [ref=e511]: Short a
+    - generic [ref=e512]: 1 / 10
+    - generic [ref=e513]: 0 correct
+  - generic [ref=e514]:
+    - generic [ref=e517]: Tap the word you hear
+    - button "Hear the word" [ref=e518] [cursor=pointer]:
+      - generic [ref=e519]: 🔊
+    - generic [ref=e520]:
+      - button "ram" [ref=e521] [cursor=pointer]
+      - button "ran" [ref=e523] [cursor=pointer]
+      - button "rat" [ref=e525] [cursor=pointer]
+      - button "jam" [ref=e527] [cursor=pointer]

@@ -1,3 +1,6 @@
+import * as W from "./words";
+import type { Word } from "./words";
+
 export type ProblemType =
   | "addition"
   | "subtraction"
@@ -17,13 +20,39 @@ export type ProblemConfig = {
   };
 };
 
-export type Skill = {
+export type Subject = "math" | "reading";
+
+type BaseSkill = {
   id: string;
   name: string;
   icon: string;
   prerequisite: string | null;
+};
+
+export type MathSkill = BaseSkill & {
   problemConfig: ProblemConfig;
 };
+
+export type ReadingConfig = {
+  /** Words practised in this skill */
+  words: Word[];
+  /**
+   * Graphemes this skill focuses on, grouped by sound. "Missing letter"
+   * questions blank one of these and offer graphemes from the other groups
+   * as wrong answers. Omit for sight words (learned whole, not sounded out).
+   */
+  soundGroups?: string[][];
+};
+
+export type ReadingSkill = BaseSkill & {
+  readingConfig: ReadingConfig;
+};
+
+export type Skill = MathSkill | ReadingSkill;
+
+export function isReadingSkill(skill: Skill): skill is ReadingSkill {
+  return "readingConfig" in skill;
+}
 
 export type Section = {
   name: string;
@@ -454,14 +483,136 @@ export const CURRICULUM: Section[] = [
   },
 ];
 
-export const ALL_SKILLS: Skill[] = CURRICULUM.flatMap((s) => s.skills);
+const SHORT_VOWELS = [["a"], ["e"], ["i"], ["o"], ["u"]];
+const DIGRAPHS = [["sh"], ["ch"], ["th"], ["ck"]];
+
+/**
+ * Early literacy, following a systematic-phonics order: short-vowel CVC words
+ * first, then sight words, digraphs, blends, long vowels and r-controlled vowels.
+ */
+export const READING_CURRICULUM: Section[] = [
+  {
+    name: "Short Vowel Words",
+    color: "#10B981",
+    skills: [
+      { id: "read_cvc_a", name: "Short a", icon: "cat", prerequisite: null,
+        readingConfig: { words: W.SHORT_A, soundGroups: SHORT_VOWELS } },
+      { id: "read_cvc_i", name: "Short i", icon: "pig", prerequisite: "read_cvc_a",
+        readingConfig: { words: W.SHORT_I, soundGroups: SHORT_VOWELS } },
+      { id: "read_cvc_o", name: "Short o", icon: "dog", prerequisite: "read_cvc_i",
+        readingConfig: { words: W.SHORT_O, soundGroups: SHORT_VOWELS } },
+      { id: "read_cvc_u", name: "Short u", icon: "sun", prerequisite: "read_cvc_o",
+        readingConfig: { words: W.SHORT_U, soundGroups: SHORT_VOWELS } },
+      { id: "read_cvc_e", name: "Short e", icon: "bed", prerequisite: "read_cvc_u",
+        readingConfig: { words: W.SHORT_E, soundGroups: SHORT_VOWELS } },
+      { id: "read_cvc_mix", name: "CVC Mix", icon: "a e i", prerequisite: "read_cvc_e",
+        readingConfig: {
+          words: [...W.SHORT_A, ...W.SHORT_I, ...W.SHORT_O, ...W.SHORT_U, ...W.SHORT_E],
+          soundGroups: SHORT_VOWELS,
+        } },
+    ],
+  },
+  {
+    name: "First Sight Words",
+    color: "#14B8A6",
+    skills: [
+      { id: "read_sight_1", name: "Sight Words 1", icon: "the", prerequisite: "read_cvc_mix",
+        readingConfig: { words: W.SIGHT_1 } },
+      { id: "read_sight_2", name: "Sight Words 2", icon: "said", prerequisite: "read_sight_1",
+        readingConfig: { words: W.SIGHT_2 } },
+    ],
+  },
+  {
+    name: "Digraphs",
+    color: "#06B6D4",
+    skills: [
+      { id: "read_digraph_sh", name: "sh words", icon: "sh", prerequisite: "read_sight_2",
+        readingConfig: { words: W.DIGRAPH_SH, soundGroups: DIGRAPHS } },
+      { id: "read_digraph_ch", name: "ch words", icon: "ch", prerequisite: "read_digraph_sh",
+        readingConfig: { words: W.DIGRAPH_CH, soundGroups: DIGRAPHS } },
+      { id: "read_digraph_th", name: "th words", icon: "th", prerequisite: "read_digraph_ch",
+        readingConfig: { words: W.DIGRAPH_TH, soundGroups: DIGRAPHS } },
+      { id: "read_digraph_ck", name: "ck words", icon: "ck", prerequisite: "read_digraph_th",
+        readingConfig: { words: W.DIGRAPH_CK, soundGroups: DIGRAPHS } },
+      { id: "read_digraph_mix", name: "Digraph Mix", icon: "sh ch", prerequisite: "read_digraph_ck",
+        readingConfig: {
+          words: [...W.DIGRAPH_SH, ...W.DIGRAPH_CH, ...W.DIGRAPH_TH, ...W.DIGRAPH_CK],
+          soundGroups: DIGRAPHS,
+        } },
+    ],
+  },
+  {
+    name: "Blends",
+    color: "#0EA5E9",
+    skills: [
+      { id: "read_blend_start", name: "Start Blends", icon: "fr", prerequisite: "read_digraph_mix",
+        readingConfig: { words: W.START_BLENDS, soundGroups: [["r"], ["l"], ["w"], ["t"], ["n"], ["p"]] } },
+      { id: "read_blend_end", name: "End Blends", icon: "nd", prerequisite: "read_blend_start",
+        readingConfig: { words: W.END_BLENDS, soundGroups: [["n"], ["s"], ["l"], ["m"], ["f"]] } },
+    ],
+  },
+  {
+    name: "More Sight Words",
+    color: "#3B82F6",
+    skills: [
+      { id: "read_sight_3", name: "Sight Words 3", icon: "they", prerequisite: "read_blend_end",
+        readingConfig: { words: W.SIGHT_3 } },
+      { id: "read_sight_4", name: "Sight Words 4", icon: "who", prerequisite: "read_sight_3",
+        readingConfig: { words: W.SIGHT_4 } },
+    ],
+  },
+  {
+    name: "Long Vowels",
+    color: "#22C55E",
+    skills: [
+      { id: "read_magic_e", name: "Magic e", icon: "a_e", prerequisite: "read_sight_4",
+        readingConfig: { words: W.MAGIC_E, soundGroups: [["a"], ["i"], ["o"], ["u"]] } },
+      { id: "read_team_ee", name: "ee & ea", icon: "ee", prerequisite: "read_magic_e",
+        readingConfig: { words: W.VOWEL_TEAMS_EE, soundGroups: [["ee", "ea"], ["ai"], ["oa"]] } },
+      { id: "read_team_ai", name: "ai & ay", icon: "ai", prerequisite: "read_team_ee",
+        readingConfig: { words: W.VOWEL_TEAMS_AI, soundGroups: [["ai", "ay"], ["ee"], ["oa"]] } },
+      { id: "read_team_oa", name: "oa & ow", icon: "oa", prerequisite: "read_team_ai",
+        readingConfig: { words: W.VOWEL_TEAMS_OA, soundGroups: [["oa", "ow"], ["ee"], ["ai"]] } },
+    ],
+  },
+  {
+    name: "Bossy R",
+    color: "#84CC16",
+    skills: [
+      { id: "read_r_ar_or", name: "ar & or", icon: "ar", prerequisite: "read_team_oa",
+        readingConfig: { words: W.BOSSY_R_AR_OR, soundGroups: [["ar"], ["or"], ["er", "ir", "ur"]] } },
+      { id: "read_r_er", name: "er ir ur", icon: "ir", prerequisite: "read_r_ar_or",
+        readingConfig: { words: W.BOSSY_R_ER, soundGroups: [["er", "ir", "ur"], ["ar"], ["or"]] } },
+    ],
+  },
+];
+
+export const SUBJECT_CURRICULA: Record<Subject, Section[]> = {
+  math: CURRICULUM,
+  reading: READING_CURRICULUM,
+};
+
+export const SKILL_SUBJECT_MAP: Record<string, Subject> = Object.fromEntries(
+  (Object.keys(SUBJECT_CURRICULA) as Subject[]).flatMap((subject) =>
+    SUBJECT_CURRICULA[subject].flatMap((section) =>
+      section.skills.map((skill) => [skill.id, subject])
+    )
+  )
+);
+
+export const SUBJECT_SKILLS: Record<Subject, Skill[]> = {
+  math: CURRICULUM.flatMap((s) => s.skills),
+  reading: READING_CURRICULUM.flatMap((s) => s.skills),
+};
+
+export const ALL_SKILLS: Skill[] = [...SUBJECT_SKILLS.math, ...SUBJECT_SKILLS.reading];
 
 export const SKILL_MAP: Record<string, Skill> = Object.fromEntries(
   ALL_SKILLS.map((s) => [s.id, s])
 );
 
 export const SKILL_SECTION_MAP: Record<string, Section> = Object.fromEntries(
-  CURRICULUM.flatMap((section) =>
+  [...CURRICULUM, ...READING_CURRICULUM].flatMap((section) =>
     section.skills.map((skill) => [skill.id, section])
   )
 );

@@ -1,0 +1,13 @@
+- generic [ref=e509]:
+  - generic [ref=e510]:
+    - generic [ref=e511]: Short a
+    - generic [ref=e512]: 9 / 10
+    - generic [ref=e513]: 7 correct
+  - generic [ref=e514]:
+    - generic [ref=e633]: Read the word. Tap its picture!
+    - generic [ref=e634]: bag
+    - generic [ref=e636]:
+      - button "🍳" [ref=e637] [cursor=pointer]
+      - button "🦇" [ref=e639] [cursor=pointer]
+      - button "👜" [ref=e641] [cursor=pointer]
+      - button "🐱" [ref=e643] [cursor=pointer]

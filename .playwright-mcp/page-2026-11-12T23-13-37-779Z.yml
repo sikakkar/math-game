@@ -1,0 +1,17 @@
+- generic [ref=e509]:
+  - generic [ref=e510]:
+    - generic [ref=e511]: Short a
+    - generic [ref=e512]: 4 / 10
+    - generic [ref=e513]: 2 correct
+  - generic [ref=e514]:
+    - generic [ref=e553]: Which sound is missing?
+    - generic [ref=e554]:
+      - generic [ref=e555]: 👨
+      - generic [ref=e556]: m _ n
+      - button "Hear the word" [ref=e557] [cursor=pointer]:
+        - generic [ref=e558]: 🔊
+    - generic [ref=e559]:
+      - button "a" [ref=e560] [cursor=pointer]
+      - button "o" [ref=e562] [cursor=pointer]
+      - button "e" [ref=e564] [cursor=pointer]
+      - button "i" [ref=e566] [cursor=pointer]
