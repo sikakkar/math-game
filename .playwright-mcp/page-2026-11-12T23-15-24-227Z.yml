@@ -1,0 +1,14 @@
+- generic [ref=f1e483]:
+  - generic [ref=f1e484]:
+    - generic [ref=f1e485]: Sight Words 1
+    - generic [ref=f1e486]: 1 / 10
+    - generic [ref=f1e487]: 0 correct
+  - generic [ref=f1e488]:
+    - generic [ref=f1e491]: Tap the word you hear
+    - button "Hear the word" [ref=f1e492] [cursor=pointer]:
+      - generic [ref=f1e493]: 🔊
+    - generic [ref=f1e494]:
+      - button "in" [ref=f1e495] [cursor=pointer]
+      - button "is" [ref=f1e497] [cursor=pointer]
+      - button "to" [ref=f1e499] [cursor=pointer]
+      - button "it" [ref=f1e501] [cursor=pointer]

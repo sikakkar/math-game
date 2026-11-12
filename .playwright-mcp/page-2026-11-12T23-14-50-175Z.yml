@@ -1,0 +1,24 @@
+- generic [ref=e509]:
+  - generic [ref=e510]:
+    - generic [ref=e511]: Short a
+    - generic [ref=e512]: 10 / 10
+    - generic [ref=e513]: 8 correct
+  - generic [ref=e514]:
+    - generic [ref=e645]: Spell the word
+    - generic [ref=e646]:
+      - generic [ref=e647]: 🐱
+      - button "Hear the word" [ref=e648] [cursor=pointer]:
+        - generic [ref=e649]: 🔊
+    - generic [ref=e650]:
+      - generic "Remove c" [ref=e660] [cursor=pointer]: c
+      - generic "Empty slot 2"
+      - generic "Empty slot 3"
+    - generic [ref=e651]:
+      - button "Tile c" [disabled]:
+        - generic [ref=e653]: c
+      - button "Tile a" [ref=e654] [cursor=pointer]:
+        - generic [ref=e655]: a
+      - button "Tile i" [ref=e656] [cursor=pointer]:
+        - generic [ref=e657]: i
+      - button "Tile t" [ref=e658] [cursor=pointer]:
+        - generic [ref=e659]: t
