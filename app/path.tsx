@@ -3,6 +3,7 @@ import { View, Text, Pressable, StyleSheet, ScrollView, Image, Platform } from "
 import { useRouter, Redirect } from "expo-router";
 import { useGame, type SkillStatus } from "../lib/context";
 import { CURRICULUM, type Section, type Skill } from "../lib/curriculum";
+import { useIsWide, CONTENT_MAX_WIDTH } from "../lib/layout";
 
 const POINTING_IMAGES = [
   require("../assets/orca/pointing.png"),
@@ -21,6 +22,7 @@ export default function PathScreen() {
     clearProfile,
   } = useGame();
   const router = useRouter();
+  const isWide = useIsWide();
   const scrollRef = useRef<ScrollView>(null);
 
   const pointingImage = useMemo(
@@ -74,20 +76,32 @@ export default function PathScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.topBar}>
-        <Pressable onPress={handleSwitchPlayer}>
-          <Text style={styles.profileName}>{profile.name}</Text>
-        </Pressable>
-        <Text style={styles.streak}>
-          {profileStats?.streak ?? 0} day streak
-        </Text>
+      <View style={[styles.topBar, isWide && styles.topBarWide]}>
+        <View
+          style={[
+            styles.topBarInner,
+            isWide && styles.column,
+            isWide && { paddingHorizontal: 24 },
+          ]}
+        >
+          <Pressable onPress={handleSwitchPlayer}>
+            <Text style={styles.profileName}>{profile.name}</Text>
+          </Pressable>
+          <Text style={styles.streak}>
+            {profileStats?.streak ?? 0} day streak
+          </Text>
+        </View>
       </View>
 
       <ScrollView
         ref={scrollRef}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          isWide && styles.scrollContentWide,
+        ]}
         showsVerticalScrollIndicator={false}
       >
+        <View style={isWide && styles.column}>
         {CURRICULUM.map((section) => (
           <View key={section.name} style={styles.section}>
             <View
@@ -99,16 +113,21 @@ export default function PathScreen() {
               <Text style={styles.sectionName}>{section.name}</Text>
             </View>
 
-            <View style={styles.nodesContainer}>
+            <View
+              style={[
+                styles.nodesContainer,
+                isWide && styles.nodesContainerWide,
+              ]}
+            >
               {section.skills.map((skill, skillIndex) => {
                 const status = getSkillStatus(skill.id);
                 const progress = getSkillProgress(skill.id);
                 const masteryLevel = progress?.mastery_level ?? 0;
                 const nodeIndex = globalNodeIndex++;
 
-                // Zigzag x-offset
+                // Zigzag x-offset (wider swing on desktop, centered in the column)
                 const xOffset =
-                  Math.sin((nodeIndex * Math.PI) / 2) * 80;
+                  Math.sin((nodeIndex * Math.PI) / 2) * (isWide ? 110 : 80);
 
                 const isPlayable = skill.id === playableId;
 
@@ -118,7 +137,9 @@ export default function PathScreen() {
                     nativeID={isPlayable ? "playable-skill" : undefined}
                     style={[
                       styles.nodeRow,
-                      { marginLeft: xOffset + 80 },
+                      isWide
+                        ? { transform: [{ translateX: xOffset }] }
+                        : { marginLeft: xOffset + 80 },
                     ]}
                   >
                     <Pressable
@@ -176,6 +197,7 @@ export default function PathScreen() {
         ))}
 
         <View style={styles.bottomSpacer} />
+        </View>
       </ScrollView>
     </View>
   );
@@ -219,15 +241,26 @@ const styles = StyleSheet.create({
     backgroundColor: "#F5F3FF",
   },
   topBar: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
     paddingTop: 56,
     paddingHorizontal: 24,
     paddingBottom: 16,
     backgroundColor: "#fff",
     borderBottomWidth: 1,
     borderBottomColor: "#E5E7EB",
+  },
+  topBarWide: {
+    paddingTop: 20,
+    paddingBottom: 20,
+  },
+  topBarInner: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  column: {
+    width: "100%",
+    maxWidth: CONTENT_MAX_WIDTH,
+    alignSelf: "center",
   },
   profileName: {
     fontSize: 20,
@@ -241,6 +274,9 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingVertical: 24,
+  },
+  scrollContentWide: {
+    paddingVertical: 40,
   },
   section: {
     marginBottom: 16,
@@ -259,6 +295,10 @@ const styles = StyleSheet.create({
   },
   nodesContainer: {
     paddingHorizontal: 12,
+  },
+  nodesContainerWide: {
+    alignItems: "center",
+    paddingVertical: 8,
   },
   nodeRow: {
     alignItems: "center",

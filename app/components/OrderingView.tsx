@@ -2,6 +2,7 @@ import { useState } from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import type { OrderingProblem } from "../../lib/problems";
 import type { SubmitPayload } from "../../lib/context";
+import { useIsWide } from "../../lib/layout";
 
 type Feedback = { result: "correct" | "wrong" } | null;
 
@@ -13,6 +14,7 @@ type Props = {
 };
 
 export default function OrderingView({ problem, sectionColor, feedback, onSubmit }: Props) {
+  const isWide = useIsWide();
   // selectedOrder stores item indices in the order the user tapped them
   const [selectedOrder, setSelectedOrder] = useState<number[]>([]);
 
@@ -54,7 +56,7 @@ export default function OrderingView({ problem, sectionColor, feedback, onSubmit
       <Text style={styles.title}>Order: smallest to biggest</Text>
 
       {/* Expression cards in 2x2 grid */}
-      <View style={styles.cardsGrid}>
+      <View style={[styles.cardsGrid, isWide && styles.cardsGridWide]}>
         {problem.items.map((item, i) => {
           const orderPos = selectedOrder.indexOf(i);
           return (
@@ -127,6 +129,9 @@ const styles = StyleSheet.create({
     gap: 12,
     justifyContent: "center",
     marginBottom: 24,
+  },
+  cardsGridWide: {
+    width: "100%",
   },
   card: {
     width: "45%",

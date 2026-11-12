@@ -12,6 +12,7 @@ import {
 import { useRouter } from "expo-router";
 import { supabase, type Profile } from "../lib/supabase";
 import { useGame } from "../lib/context";
+import { useIsWide } from "../lib/layout";
 
 const GREETING_IMAGES = [
   require("../assets/orca/greeting.png"),
@@ -27,6 +28,7 @@ export default function ProfilePicker() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const { selectProfile } = useGame();
   const router = useRouter();
+  const isWide = useIsWide();
 
   const orcaImage = useMemo(
     () => GREETING_IMAGES[Math.floor(Math.random() * GREETING_IMAGES.length)],
@@ -81,11 +83,17 @@ export default function ProfilePicker() {
       contentContainerStyle={styles.container}
       bounces={false}
     >
-      <Image source={orcaImage} style={styles.orca} resizeMode="contain" />
-      <Text style={styles.title}>Who's playing?</Text>
-      <View style={styles.cards}>
+      <Image
+        source={orcaImage}
+        style={[styles.orca, isWide && styles.orcaWide]}
+        resizeMode="contain"
+      />
+      <Text style={[styles.title, isWide && styles.titleWide]}>
+        Who's playing?
+      </Text>
+      <View style={[styles.cards, isWide && styles.cardsWide]}>
         {profiles.map((p) => (
-          <View key={p.id}>
+          <View key={p.id} style={isWide && styles.cardSlotWide}>
             <Pressable
               style={[styles.card, styles.cardPurple]}
               onPress={() => handlePick(p)}
@@ -116,7 +124,7 @@ export default function ProfilePicker() {
         ))}
 
         {showForm ? (
-          <View style={styles.formContainer}>
+          <View style={[styles.formContainer, isWide && styles.cardSlotWide]}>
             <TextInput
               style={styles.input}
               placeholder="Player name"
@@ -145,7 +153,7 @@ export default function ProfilePicker() {
           </View>
         ) : (
           <Pressable
-            style={styles.addButton}
+            style={[styles.addButton, isWide && styles.addButtonWide]}
             onPress={() => setShowForm(true)}
           >
             <Text style={styles.addButtonText}>+</Text>
@@ -179,6 +187,27 @@ const styles = StyleSheet.create({
     gap: 24,
     width: "100%",
     maxWidth: 320,
+  },
+  cardsWide: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    maxWidth: 760,
+  },
+  cardSlotWide: {
+    width: 230,
+  },
+  orcaWide: {
+    width: 260,
+    height: 160,
+  },
+  titleWide: {
+    fontSize: 44,
+  },
+  addButtonWide: {
+    width: 230,
+    justifyContent: "center",
+    height: 96,
   },
   card: {
     borderRadius: 20,
