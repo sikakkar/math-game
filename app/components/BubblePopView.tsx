@@ -2,6 +2,7 @@ import { useState } from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import type { BubblePopProblem } from "../../lib/problems";
 import type { SubmitPayload } from "../../lib/context";
+import SpeakButton from "./SpeakButton";
 
 type Feedback = { result: "correct" | "wrong" } | null;
 
@@ -60,7 +61,10 @@ export default function BubblePopView({ problem, sectionColor, feedback, onSubmi
 
   return (
     <>
-      <Text style={styles.title}>Tap all that equal {problem.targetValue}</Text>
+      <View style={styles.titleRow}>
+        <Text style={styles.title}>{problem.title ?? `Tap all that equal ${problem.targetValue}`}</Text>
+        {problem.speakText ? <SpeakButton text={problem.speakText} color={sectionColor} /> : null}
+      </View>
       <View style={styles.grid}>
         {problem.bubbles.map((bubble, i) => (
           <Pressable
@@ -87,12 +91,19 @@ export default function BubblePopView({ problem, sectionColor, feedback, onSubmi
 }
 
 const styles = StyleSheet.create({
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    marginBottom: 20,
+  },
   title: {
     fontSize: 28,
     fontWeight: "700",
     color: "#1E1B4B",
-    marginBottom: 20,
     textAlign: "center",
+    flexShrink: 1,
   },
   grid: {
     flexDirection: "row",

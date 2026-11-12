@@ -10,6 +10,7 @@ import ComparisonView from "./components/ComparisonView";
 import BubblePopView from "./components/BubblePopView";
 import EquationBuilderView from "./components/EquationBuilderView";
 import OrderingView from "./components/OrderingView";
+import WordChoiceView from "./components/WordChoiceView";
 
 type FeedbackState =
   | { kind: "multiple_choice"; index: number; result: "correct" | "wrong" }
@@ -17,6 +18,7 @@ type FeedbackState =
   | { kind: "bubble_pop"; result: "correct" | "wrong" }
   | { kind: "equation_builder"; result: "correct" | "wrong" }
   | { kind: "ordering"; result: "correct" | "wrong" }
+  | { kind: "word_choice"; index: number; result: "correct" | "wrong" }
   | null;
 
 const THINKING_IMAGES = [
@@ -87,6 +89,9 @@ export default function GameScreen() {
         case "ordering":
           fb = { kind: "ordering", result };
           break;
+        case "word_choice":
+          fb = { kind: "word_choice", index: feedbackMeta.index, result };
+          break;
       }
 
       setFeedback(fb);
@@ -135,6 +140,7 @@ export default function GameScreen() {
       <View style={styles.questionArea}>
         <Image source={orcaSource} style={styles.orca} resizeMode="contain" />
         <ProblemView
+          key={problemIndex}
           problem={currentProblem}
           sectionColor={sectionColor}
           feedback={feedback}
@@ -199,6 +205,15 @@ function ProblemView({
           problem={problem}
           sectionColor={sectionColor}
           feedback={feedback?.kind === "ordering" ? feedback : null}
+          onSubmit={onSubmit}
+        />
+      );
+    case "word_choice":
+      return (
+        <WordChoiceView
+          problem={problem}
+          sectionColor={sectionColor}
+          feedback={feedback?.kind === "word_choice" ? feedback : null}
           onSubmit={onSubmit}
         />
       );
