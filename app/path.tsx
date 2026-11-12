@@ -1,8 +1,8 @@
-import { useEffect, useRef, useMemo } from "react";
+import { useEffect, useRef, useMemo, useState } from "react";
 import { View, Text, Pressable, StyleSheet, ScrollView, Image, Platform } from "react-native";
 import { useRouter, Redirect } from "expo-router";
-import { useGame, type SkillStatus } from "../lib/context";
-import { CURRICULUM, type Section, type Skill } from "../lib/curriculum";
+import { useGame, type SkillStatus, type SkipQuizInfo } from "../lib/context";
+import { CURRICULUM, SKILL_MAP, SKILL_SECTION_MAP, type Skill } from "../lib/curriculum";
 
 const POINTING_IMAGES = [
   require("../assets/orca/pointing.png"),
@@ -15,6 +15,8 @@ export default function PathScreen() {
     profile,
     profileStats,
     startLesson,
+    getSkipQuizInfo,
+    startSkipQuiz,
     getSkillStatus,
     getSkillProgress,
     getPlayableSkillId,
@@ -22,6 +24,7 @@ export default function PathScreen() {
   } = useGame();
   const router = useRouter();
   const scrollRef = useRef<ScrollView>(null);
+  const [skipOffer, setSkipOffer] = useState<SkipQuizInfo | null>(null);
 
   const pointingImage = useMemo(
     () => POINTING_IMAGES[Math.floor(Math.random() * POINTING_IMAGES.length)],
@@ -60,8 +63,19 @@ export default function PathScreen() {
   const playableId = getPlayableSkillId();
 
   const handleNodePress = (skill: Skill) => {
-    if (skill.id !== playableId) return;
-    startLesson(skill.id);
+    if (skill.id === playableId) {
+      startLesson(skill.id);
+      router.push("/game");
+      return;
+    }
+    const info = getSkipQuizInfo(skill.id);
+    if (info) setSkipOffer(info);
+  };
+
+  const handleStartSkipQuiz = () => {
+    if (!skipOffer) return;
+    startSkipQuiz(skipOffer.targetSkillId);
+    setSkipOffer(null);
     router.push("/game");
   };
 
@@ -127,7 +141,10 @@ export default function PathScreen() {
                         getNodeStyle(status, section.color, isPlayable),
                       ]}
                       onPress={() => handleNodePress(skill)}
-                      disabled={!isPlayable}
+                      disabled={!isPlayable && status !== "locked"}
+                      accessibilityLabel={
+                        status === "locked" ? `Skip ahead to ${skill.name}` : skill.name
+                      }
                     >
                       <Text
                         style={[
@@ -177,6 +194,51 @@ export default function PathScreen() {
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
+
+      {skipOffer && (
+        <SkipQuizOffer
+          info={skipOffer}
+          onStart={handleStartSkipQuiz}
+          onCancel={() => setSkipOffer(null)}
+        />
+      )}
+    </View>
+  );
+}
+
+function SkipQuizOffer({
+  info,
+  onStart,
+  onCancel,
+}: {
+  info: SkipQuizInfo;
+  onStart: () => void;
+  onCancel: () => void;
+}) {
+  const target = SKILL_MAP[info.targetSkillId];
+  const color = SKILL_SECTION_MAP[info.targetSkillId]?.color ?? "#6C63FF";
+  const skippedNames = info.skippedSkillIds.map((id) => SKILL_MAP[id]?.name ?? id);
+
+  return (
+    <View style={styles.overlay}>
+      <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
+      <View style={styles.offerCard}>
+        <Text style={styles.offerTitle}>Jump ahead to {target?.name}?</Text>
+        <Text style={styles.offerBody}>
+          Show you're ready with a quick {info.questionCount}-question quiz. Get{" "}
+          {info.passMark} right to skip:
+        </Text>
+        <Text style={styles.offerSkills}>{skippedNames.join(" · ")}</Text>
+        <Pressable
+          style={[styles.offerButton, { backgroundColor: color }]}
+          onPress={onStart}
+        >
+          <Text style={styles.offerButtonText}>Take the quiz</Text>
+        </Pressable>
+        <Pressable style={styles.offerCancel} onPress={onCancel}>
+          <Text style={styles.offerCancelText}>Not now</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -317,5 +379,59 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: 60,
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(30, 27, 75, 0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  offerCard: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 24,
+    width: "100%",
+    maxWidth: 340,
+    alignItems: "center",
+  },
+  offerTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#1E1B4B",
+    textAlign: "center",
+    marginBottom: 12,
+  },
+  offerBody: {
+    fontSize: 16,
+    color: "#374151",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  offerSkills: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#6B7280",
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  offerButton: {
+    borderRadius: 16,
+    paddingVertical: 16,
+    width: "100%",
+    alignItems: "center",
+  },
+  offerButtonText: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#fff",
+  },
+  offerCancel: {
+    paddingVertical: 14,
+  },
+  offerCancelText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#6B7280",
   },
 });

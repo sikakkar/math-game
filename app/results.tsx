@@ -24,6 +24,79 @@ const MASTERY_LABELS: Record<number, string> = {
 };
 
 export default function ResultsScreen() {
+  const { sessionMode } = useGame();
+  return sessionMode === "skip_quiz" ? <SkipQuizResults /> : <LessonResults />;
+}
+
+function SkipQuizResults() {
+  const { sessionScore, sessionLength, sessionMissed, skipQuiz, skipQuizPassed, syncResults } =
+    useGame();
+  const router = useRouter();
+  const [syncing, setSyncing] = useState(true);
+
+  useEffect(() => {
+    syncResults().then(() => setSyncing(false));
+    // Sync exactly once for this quiz
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const passed = skipQuizPassed ?? (skipQuiz ? sessionScore >= skipQuiz.passMark : false);
+  const orcaImage = useMemo(() => {
+    const pool = passed ? CELEBRATING_IMAGES : ENCOURAGING_IMAGES;
+    return pool[Math.floor(Math.random() * pool.length)];
+  }, [passed]);
+
+  if (!skipQuiz) return null;
+  const target = SKILL_MAP[skipQuiz.targetSkillId];
+  const sectionColor = SKILL_SECTION_MAP[skipQuiz.targetSkillId]?.color ?? "#6C63FF";
+
+  return (
+    <ScrollView contentContainerStyle={styles.container} bounces={false}>
+      <Image source={orcaImage} style={styles.orca} resizeMode="contain" />
+
+      <Text style={[styles.skillName, { color: sectionColor }]}>Skip quiz</Text>
+      <Text style={styles.scoreText}>
+        {sessionScore} / {sessionLength} correct
+      </Text>
+
+      <View style={styles.masterySection}>
+        {passed ? (
+          <Text style={styles.advanceText}>
+            You're ready! {target?.name} is unlocked.
+          </Text>
+        ) : (
+          <Text style={styles.quizFailText}>
+            Not quite yet — you needed {skipQuiz.passMark}. Keep practicing and try again
+            any time!
+          </Text>
+        )}
+      </View>
+
+      {sessionMissed.length > 0 && (
+        <View style={styles.missedSection}>
+          <Text style={styles.missedTitle}>Review these:</Text>
+          {sessionMissed.map((m, i) => (
+            <Text key={i} style={styles.missedItem}>
+              {m.description} → {m.answer}
+            </Text>
+          ))}
+        </View>
+      )}
+
+      <View style={styles.buttons}>
+        <Pressable
+          style={[styles.button, { backgroundColor: sectionColor }, syncing && { opacity: 0.5 }]}
+          onPress={() => router.replace("/path")}
+          disabled={syncing}
+        >
+          <Text style={styles.buttonText}>{passed ? "Let's go!" : "Back to Path"}</Text>
+        </Pressable>
+      </View>
+    </ScrollView>
+  );
+}
+
+function LessonResults() {
   const {
     sessionScore,
     sessionMissed,
@@ -224,6 +297,13 @@ const styles = StyleSheet.create({
   },
   dotEmpty: {
     backgroundColor: "#D1D5DB",
+  },
+  quizFailText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#6B7280",
+    textAlign: "center",
+    maxWidth: 300,
   },
   advanceText: {
     fontSize: 16,
