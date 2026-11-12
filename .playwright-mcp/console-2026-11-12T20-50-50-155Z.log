@@ -1,6 +1,0 @@
-[    3673ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:8099/index.ts.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app&unstable_transformProfile=hermes-stable:17372
-[    3697ms] [LOG] Running application "main" with appParams:
- {rootTag: #root, hydrate: undefined} 
-Development-level warnings: ON.
-Performance optimizations: OFF. @ http://localhost:8099/index.ts.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app&unstable_transformProfile=hermes-stable:65335
-[    3751ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://127.0.0.1:54321/rest/v1/profiles?select=*&order=created_at.asc:0
