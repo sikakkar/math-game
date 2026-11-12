@@ -1,0 +1,16 @@
+version: 1
+app:
+  start: .woodshed/start.sh
+  stop: .woodshed/stop.sh
+  frontendPort: 8081
+  backendPort: 54321
+  logs:
+    frontend: ~/logs/frontend.log
+    backend: ~/logs/backend.log
+  howToProve: >-
+    Open http://localhost:8081 in the Playwright browser. Pick or create a player on "Who's playing?",
+    then open the path, tap the glowing skill and play a lesson through to the results screen.
+    Check layout at both phone width (390x844) and desktop width (1440x900, layout switches at 768px).
+    Data lives in the local Supabase at :54321; inspect it with
+    `curl http://127.0.0.1:54321/rest/v1/<table>` using the anon key from `npx supabase status -o env`.
+    Expo logs are in ~/logs/frontend.log. There is no test suite; run `npx tsc --noEmit`.
