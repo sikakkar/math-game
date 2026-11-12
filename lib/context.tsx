@@ -14,6 +14,7 @@ import {
   MASTERY_THRESHOLDS,
   type Skill,
 } from "./curriculum";
+import { planSkipQuiz, type SkipQuizPlan } from "./skipQuiz";
 
 // --- Submit payload discriminated union ---
 
@@ -45,11 +46,20 @@ type GameState = {
   sessionScore: number;
   sessionMissed: MissedProblem[];
   sessionPlan: SessionSlotKind[];
+  /** Skill each question in the session is drawn from (length = session length) */
+  sessionSkillIds: string[];
+  /** Set while the session is a skip-ahead quiz rather than a normal lesson */
+  skipQuiz: SkipQuizPlan | null;
+  /** Outcome of the last synced skip quiz, for the results screen */
+  lastSkipResult: { passed: boolean; targetSkillId: string } | null;
 };
 
 type GameContextType = GameState & {
   selectProfile: (profile: Profile) => Promise<void>;
   startLesson: (skillId: string) => void;
+  startSkipQuiz: (targetSkillId: string) => boolean;
+  getSkipQuizPlan: (targetSkillId: string) => SkipQuizPlan | null;
+  sessionLength: number;
   submitAnswer: (payload: SubmitPayload) => "correct" | "wrong";
   nextProblem: () => void;
   isSessionOver: () => boolean;
@@ -61,6 +71,18 @@ type GameContextType = GameState & {
 };
 
 const PROBLEMS_PER_SESSION = 10;
+
+const EMPTY_SESSION = {
+  activeSkillId: null,
+  currentProblem: null,
+  problemIndex: 0,
+  sessionScore: 0,
+  sessionMissed: [],
+  sessionPlan: [],
+  sessionSkillIds: [],
+  skipQuiz: null,
+  lastSkipResult: null,
+} satisfies Partial<GameState>;
 
 const GameContext = createContext<GameContextType | null>(null);
 
@@ -105,12 +127,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     profile: null,
     profileStats: null,
     skillProgressMap: {},
-    activeSkillId: null,
-    currentProblem: null,
-    problemIndex: 0,
-    sessionScore: 0,
-    sessionMissed: [],
-    sessionPlan: [],
+    ...EMPTY_SESSION,
   });
 
   const selectProfile = useCallback(async (profile: Profile) => {
@@ -198,14 +215,43 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
     setState((s) => ({
       ...s,
+      ...EMPTY_SESSION,
       activeSkillId: skillId,
-      problemIndex: 0,
-      sessionScore: 0,
-      sessionMissed: [],
       sessionPlan: plan,
+      sessionSkillIds: Array(PROBLEMS_PER_SESSION).fill(skillId),
       currentProblem: problem,
     }));
   }, []);
+
+  const getSkipQuizPlan = useCallback(
+    (targetSkillId: string): SkipQuizPlan | null => {
+      if (getSkillStatus(targetSkillId) !== "locked") return null;
+      return planSkipQuiz(targetSkillId, getPlayableSkillId());
+    },
+    [getSkillStatus, getPlayableSkillId]
+  );
+
+  const startSkipQuiz = useCallback(
+    (targetSkillId: string): boolean => {
+      const quiz = getSkipQuizPlan(targetSkillId);
+      if (!quiz) return false;
+
+      const firstSkill = SKILL_MAP[quiz.questionSkillIds[0]];
+      const problem = generateForSlot(quiz.slots[0], firstSkill.problemConfig);
+
+      setState((s) => ({
+        ...s,
+        ...EMPTY_SESSION,
+        activeSkillId: targetSkillId,
+        sessionPlan: quiz.slots,
+        sessionSkillIds: quiz.questionSkillIds,
+        skipQuiz: quiz,
+        currentProblem: problem,
+      }));
+      return true;
+    },
+    [getSkipQuizPlan]
+  );
 
   const submitAnswer = useCallback(
     (payload: SubmitPayload): "correct" | "wrong" => {
@@ -233,11 +279,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const nextProblem = useCallback(() => {
     setState((s) => {
       const nextIndex = s.problemIndex + 1;
-      if (nextIndex >= PROBLEMS_PER_SESSION) {
+      if (nextIndex >= s.sessionSkillIds.length) {
         return { ...s, problemIndex: nextIndex, currentProblem: null };
       }
 
-      const skill = s.activeSkillId ? SKILL_MAP[s.activeSkillId] : null;
+      const skill = SKILL_MAP[s.sessionSkillIds[nextIndex]];
       if (!skill) return { ...s, problemIndex: nextIndex, currentProblem: null };
 
       const slotKind = s.sessionPlan[nextIndex] ?? "multiple_choice";
@@ -247,46 +293,81 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const isSessionOver = useCallback(() => {
-    return state.problemIndex >= PROBLEMS_PER_SESSION;
-  }, [state.problemIndex]);
+    return (
+      state.sessionSkillIds.length > 0 &&
+      state.problemIndex >= state.sessionSkillIds.length
+    );
+  }, [state.problemIndex, state.sessionSkillIds.length]);
 
   const syncResults = useCallback(async () => {
     if (!state.profile || !state.activeSkillId) return;
 
     const skillId = state.activeSkillId;
-    const existing = state.skillProgressMap[skillId];
-    const currentLevel = existing?.mastery_level ?? 0;
-    const score = state.sessionScore;
+    const sessionLength = state.sessionSkillIds.length;
+    const now = new Date();
 
-    let newLevel = currentLevel;
-    if (currentLevel === 0) {
-      newLevel = 1;
-    } else if (currentLevel === 1 && score >= MASTERY_THRESHOLDS[1]) {
-      newLevel = 2;
-    } else if (currentLevel === 2 && score >= MASTERY_THRESHOLDS[2]) {
-      newLevel = 3;
+    // --- Skill progress ---
+    const profileId = state.profile.id;
+    const progressRow = (id: string, masteryLevel: number, bestScore: number, attempts: number) => ({
+      profile_id: profileId,
+      skill_id: id,
+      mastery_level: masteryLevel,
+      best_score: bestScore,
+      attempts,
+      updated_at: now.toISOString(),
+    });
+
+    let rows: ReturnType<typeof progressRow>[] = [];
+    let skipResult: GameState["lastSkipResult"] = null;
+
+    if (state.skipQuiz) {
+      const quiz = state.skipQuiz;
+      const passed = state.sessionScore >= quiz.passScore;
+      skipResult = { passed, targetSkillId: quiz.targetSkillId };
+      if (passed) {
+        // Mark every skipped skill as mastered so the target unlocks.
+        // Never lower a level the player already earned.
+        rows = quiz.skippedSkillIds.map((id) => {
+          const ex = state.skillProgressMap[id];
+          return progressRow(id, Math.max(ex?.mastery_level ?? 0, 3), ex?.best_score ?? 0, ex?.attempts ?? 0);
+        });
+      }
+    } else {
+      const existing = state.skillProgressMap[skillId];
+      const currentLevel = existing?.mastery_level ?? 0;
+      const score = state.sessionScore;
+
+      let newLevel = currentLevel;
+      if (currentLevel === 0) {
+        newLevel = 1;
+      } else if (currentLevel === 1 && score >= MASTERY_THRESHOLDS[1]) {
+        newLevel = 2;
+      } else if (currentLevel === 2 && score >= MASTERY_THRESHOLDS[2]) {
+        newLevel = 3;
+      }
+
+      rows = [
+        progressRow(
+          skillId,
+          newLevel,
+          Math.max(existing?.best_score ?? 0, score),
+          (existing?.attempts ?? 0) + 1
+        ),
+      ];
     }
 
-    const bestScore = Math.max(existing?.best_score ?? 0, score);
-    const attempts = (existing?.attempts ?? 0) + 1;
+    let progressRows: SkillProgress[] = [];
+    if (rows.length > 0) {
+      const { data: upserted } = await supabase
+        .from("skill_progress")
+        .upsert(rows, { onConflict: "profile_id,skill_id" })
+        .select();
+      progressRows =
+        upserted ??
+        rows.map((r) => ({ id: state.skillProgressMap[r.skill_id]?.id ?? "", ...r }));
+    }
 
-    const { data: upsertedProgress } = await supabase
-      .from("skill_progress")
-      .upsert(
-        {
-          profile_id: state.profile.id,
-          skill_id: skillId,
-          mastery_level: newLevel,
-          best_score: bestScore,
-          attempts,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "profile_id,skill_id" }
-      )
-      .select()
-      .single();
-
-    const now = new Date();
+    // --- Profile stats ---
     const lastPlayed = state.profileStats
       ? new Date(state.profileStats.last_played_at)
       : now;
@@ -304,7 +385,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     }
 
     const totalCompleted =
-      (state.profileStats?.total_completed ?? 0) + PROBLEMS_PER_SESSION;
+      (state.profileStats?.total_completed ?? 0) + sessionLength;
 
     const { data: upsertedStats } = await supabase
       .from("profile_stats")
@@ -322,23 +403,14 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
     setState((s) => {
       const newMap = { ...s.skillProgressMap };
-      if (upsertedProgress) {
-        newMap[skillId] = upsertedProgress;
-      } else {
-        newMap[skillId] = {
-          id: existing?.id ?? "",
-          profile_id: s.profile!.id,
-          skill_id: skillId,
-          mastery_level: newLevel,
-          best_score: bestScore,
-          attempts,
-          updated_at: now.toISOString(),
-        };
+      for (const row of progressRows) {
+        newMap[row.skill_id] = row;
       }
 
       return {
         ...s,
         skillProgressMap: newMap,
+        lastSkipResult: skipResult,
         profileStats: upsertedStats ?? {
           id: s.profileStats?.id ?? "",
           profile_id: s.profile!.id,
@@ -352,6 +424,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     state.profile,
     state.activeSkillId,
     state.sessionScore,
+    state.sessionSkillIds.length,
+    state.skipQuiz,
     state.skillProgressMap,
     state.profileStats,
   ]);
@@ -361,12 +435,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       profile: null,
       profileStats: null,
       skillProgressMap: {},
-      activeSkillId: null,
-      currentProblem: null,
-      problemIndex: 0,
-      sessionScore: 0,
-      sessionMissed: [],
-      sessionPlan: [],
+      ...EMPTY_SESSION,
     });
   }, []);
 
@@ -376,6 +445,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         ...state,
         selectProfile,
         startLesson,
+        startSkipQuiz,
+        getSkipQuizPlan,
+        sessionLength: state.sessionSkillIds.length,
         submitAnswer,
         nextProblem,
         isSessionOver,
