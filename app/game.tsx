@@ -3,13 +3,15 @@ import { View, Text, StyleSheet, Image } from "react-native";
 import { useRouter, Redirect } from "expo-router";
 import { useGame, type SubmitPayload } from "../lib/context";
 import { SKILL_MAP, SKILL_SECTION_MAP } from "../lib/curriculum";
-import type { Problem } from "../lib/problems";
+import type { AnyProblem } from "../lib/context";
 
 import MultipleChoiceView from "./components/MultipleChoiceView";
 import ComparisonView from "./components/ComparisonView";
 import BubblePopView from "./components/BubblePopView";
 import EquationBuilderView from "./components/EquationBuilderView";
 import OrderingView from "./components/OrderingView";
+import WordChoiceView from "./components/WordChoiceView";
+import SpellWordView from "./components/SpellWordView";
 
 type FeedbackState =
   | { kind: "multiple_choice"; index: number; result: "correct" | "wrong" }
@@ -17,6 +19,8 @@ type FeedbackState =
   | { kind: "bubble_pop"; result: "correct" | "wrong" }
   | { kind: "equation_builder"; result: "correct" | "wrong" }
   | { kind: "ordering"; result: "correct" | "wrong" }
+  | { kind: "word_choice"; index: number; result: "correct" | "wrong" }
+  | { kind: "spell_word"; result: "correct" | "wrong" }
   | null;
 
 const THINKING_IMAGES = [
@@ -87,6 +91,12 @@ export default function GameScreen() {
         case "ordering":
           fb = { kind: "ordering", result };
           break;
+        case "word_choice":
+          fb = { kind: "word_choice", index: feedbackMeta.index, result };
+          break;
+        case "spell_word":
+          fb = { kind: "spell_word", result };
+          break;
       }
 
       setFeedback(fb);
@@ -135,6 +145,7 @@ export default function GameScreen() {
       <View style={styles.questionArea}>
         <Image source={orcaSource} style={styles.orca} resizeMode="contain" />
         <ProblemView
+          key={problemIndex}
           problem={currentProblem}
           sectionColor={sectionColor}
           feedback={feedback}
@@ -151,7 +162,7 @@ function ProblemView({
   feedback,
   onSubmit,
 }: {
-  problem: Problem;
+  problem: AnyProblem;
   sectionColor: string;
   feedback: FeedbackState;
   onSubmit: (payload: SubmitPayload, feedbackMeta: any) => void;
@@ -199,6 +210,24 @@ function ProblemView({
           problem={problem}
           sectionColor={sectionColor}
           feedback={feedback?.kind === "ordering" ? feedback : null}
+          onSubmit={onSubmit}
+        />
+      );
+    case "word_choice":
+      return (
+        <WordChoiceView
+          problem={problem}
+          sectionColor={sectionColor}
+          feedback={feedback?.kind === "word_choice" ? feedback : null}
+          onSubmit={onSubmit}
+        />
+      );
+    case "spell_word":
+      return (
+        <SpellWordView
+          problem={problem}
+          sectionColor={sectionColor}
+          feedback={feedback?.kind === "spell_word" ? feedback : null}
           onSubmit={onSubmit}
         />
       );

@@ -8,12 +8,30 @@ import {
   type SessionSlotKind,
 } from "./problems";
 import {
+  generateReadingForSlot,
+  generateReadingSessionPlan,
+  type ReadingProblem,
+  type ReadingSlotKind,
+} from "./reading";
+import {
   SKILL_MAP,
-  SKILL_SECTION_MAP,
-  ALL_SKILLS,
+  SKILL_SUBJECT_MAP,
+  SUBJECT_SKILLS,
   MASTERY_THRESHOLDS,
+  isReadingSkill,
   type Skill,
+  type Subject,
 } from "./curriculum";
+
+export type AnyProblem = Problem | ReadingProblem;
+type SlotKind = SessionSlotKind | ReadingSlotKind;
+
+function generateForSkill(skill: Skill, slot: SlotKind): AnyProblem {
+  if (isReadingSkill(skill)) {
+    return generateReadingForSlot(slot as ReadingSlotKind, skill.readingConfig);
+  }
+  return generateForSlot(slot as SessionSlotKind, skill.problemConfig);
+}
 
 // --- Submit payload discriminated union ---
 
@@ -22,7 +40,9 @@ export type SubmitPayload =
   | { kind: "comparison"; choice: "A" | "B" }
   | { kind: "bubble_pop"; selectedIndices: number[] }
   | { kind: "equation_builder"; arrangedTiles: string[] }
-  | { kind: "ordering"; selectedOrder: number[] };
+  | { kind: "ordering"; selectedOrder: number[] }
+  | { kind: "word_choice"; choice: string }
+  | { kind: "spell_word"; arranged: string[] };
 
 // --- Generalized missed problem ---
 
@@ -39,16 +59,18 @@ type GameState = {
   profile: Profile | null;
   profileStats: ProfileStats | null;
   skillProgressMap: Record<string, SkillProgress>;
+  activeSubject: Subject;
   activeSkillId: string | null;
-  currentProblem: Problem | null;
+  currentProblem: AnyProblem | null;
   problemIndex: number;
   sessionScore: number;
   sessionMissed: MissedProblem[];
-  sessionPlan: SessionSlotKind[];
+  sessionPlan: SlotKind[];
 };
 
 type GameContextType = GameState & {
   selectProfile: (profile: Profile) => Promise<void>;
+  setSubject: (subject: Subject) => void;
   startLesson: (skillId: string) => void;
   submitAnswer: (payload: SubmitPayload) => "correct" | "wrong";
   nextProblem: () => void;
@@ -57,7 +79,8 @@ type GameContextType = GameState & {
   clearProfile: () => void;
   getSkillStatus: (skillId: string) => SkillStatus;
   getSkillProgress: (skillId: string) => SkillProgress | null;
-  getPlayableSkillId: () => string | null;
+  /** The skill the player should do next in a subject (the active subject if omitted) */
+  getPlayableSkillId: (subject?: Subject) => string | null;
 };
 
 const PROBLEMS_PER_SESSION = 10;
@@ -65,7 +88,7 @@ const PROBLEMS_PER_SESSION = 10;
 const GameContext = createContext<GameContextType | null>(null);
 
 /** Check if an answer is correct for a given problem and payload */
-function checkAnswer(problem: Problem, payload: SubmitPayload): { correct: boolean; description: string; answerStr: string } {
+function checkAnswer(problem: AnyProblem, payload: SubmitPayload): { correct: boolean; description: string; answerStr: string } {
   switch (problem.kind) {
     case "multiple_choice": {
       if (payload.kind !== "multiple_choice") return { correct: false, description: problem.question, answerStr: String(problem.answer) };
@@ -97,6 +120,25 @@ function checkAnswer(problem: Problem, payload: SubmitPayload): { correct: boole
         payload.selectedOrder.every((val, idx) => val === problem.correctOrder[idx]);
       return { correct, description: "Order smallest to biggest", answerStr: problem.correctOrder.map(i => problem.items[i]).join(", ") };
     }
+    case "word_choice": {
+      const correct = payload.kind === "word_choice" && payload.choice === problem.answer;
+      switch (problem.mode) {
+        case "missing_sound":
+          return { correct, description: `${problem.display} (${problem.word})`, answerStr: problem.answer };
+        case "rhyme":
+          return { correct, description: `Rhymes with ${problem.word}`, answerStr: problem.answer };
+        case "picture_to_word":
+          return { correct, description: problem.emoji ?? problem.word, answerStr: problem.word };
+        case "word_to_picture":
+          return { correct, description: problem.word, answerStr: problem.answer };
+        case "listen":
+          return { correct, description: "🔊", answerStr: problem.word };
+      }
+    }
+    case "spell_word": {
+      const correct = payload.kind === "spell_word" && payload.arranged.join("") === problem.word;
+      return { correct, description: `Spell ${problem.emoji ?? "🔊"}`, answerStr: problem.word };
+    }
   }
 }
 
@@ -105,6 +147,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     profile: null,
     profileStats: null,
     skillProgressMap: {},
+    activeSubject: "math",
     activeSkillId: null,
     currentProblem: null,
     problemIndex: 0,
@@ -178,26 +221,33 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     [state.skillProgressMap]
   );
 
-  const getPlayableSkillId = useCallback((): string | null => {
+  const setSubject = useCallback((subject: Subject) => {
+    setState((s) => ({ ...s, activeSubject: subject }));
+  }, []);
+
+  const getPlayableSkillId = useCallback((subject?: Subject): string | null => {
     let playable: string | null = null;
-    for (const skill of ALL_SKILLS) {
+    for (const skill of SUBJECT_SKILLS[subject ?? state.activeSubject]) {
       const status = getSkillStatus(skill.id);
       if (status === "available" || status === "learning" || status === "practicing") {
         playable = skill.id;
       }
     }
     return playable;
-  }, [getSkillStatus]);
+  }, [getSkillStatus, state.activeSubject]);
 
   const startLesson = useCallback((skillId: string) => {
     const skill = SKILL_MAP[skillId];
     if (!skill) return;
 
-    const plan = generateSessionPlan();
-    const problem = generateForSlot(plan[0], skill.problemConfig);
+    const plan: SlotKind[] = isReadingSkill(skill)
+      ? generateReadingSessionPlan()
+      : generateSessionPlan();
+    const problem = generateForSkill(skill, plan[0]);
 
     setState((s) => ({
       ...s,
+      activeSubject: SKILL_SUBJECT_MAP[skillId] ?? s.activeSubject,
       activeSkillId: skillId,
       problemIndex: 0,
       sessionScore: 0,
@@ -241,7 +291,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       if (!skill) return { ...s, problemIndex: nextIndex, currentProblem: null };
 
       const slotKind = s.sessionPlan[nextIndex] ?? "multiple_choice";
-      const problem = generateForSlot(slotKind, skill.problemConfig);
+      const problem = generateForSkill(skill, slotKind);
       return { ...s, problemIndex: nextIndex, currentProblem: problem };
     });
   }, []);
@@ -361,6 +411,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       profile: null,
       profileStats: null,
       skillProgressMap: {},
+      activeSubject: "math",
       activeSkillId: null,
       currentProblem: null,
       problemIndex: 0,
@@ -375,6 +426,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       value={{
         ...state,
         selectProfile,
+        setSubject,
         startLesson,
         submitAnswer,
         nextProblem,
