@@ -1,8 +1,9 @@
-import { useEffect, useRef, useMemo } from "react";
-import { View, Text, Pressable, StyleSheet, ScrollView, Image, Platform } from "react-native";
+import { useEffect, useRef, useMemo, useState } from "react";
+import { View, Text, Pressable, StyleSheet, ScrollView, Image, Platform, Modal } from "react-native";
 import { useRouter, Redirect } from "expo-router";
 import { useGame, type SkillStatus } from "../lib/context";
-import { CURRICULUM, type Section, type Skill } from "../lib/curriculum";
+import { CURRICULUM, SKILL_MAP, type Skill } from "../lib/curriculum";
+import { generateFromConfig, type MultipleChoiceProblem } from "../lib/problems";
 
 const POINTING_IMAGES = [
   require("../assets/orca/pointing.png"),
@@ -19,7 +20,9 @@ export default function PathScreen() {
     getSkillProgress,
     getPlayableSkillId,
     clearProfile,
+    skipToSkill,
   } = useGame();
+  const [quiz, setQuiz] = useState<{ skill: Skill; problem: MultipleChoiceProblem; picked: number | null } | null>(null);
   const router = useRouter();
   const scrollRef = useRef<ScrollView>(null);
 
@@ -60,9 +63,32 @@ export default function PathScreen() {
   const playableId = getPlayableSkillId();
 
   const handleNodePress = (skill: Skill) => {
+    if (getSkillStatus(skill.id) === "locked") {
+      // Quiz on the prerequisite skill: the knowledge needed for this level
+      const prereq = skill.prerequisite ? SKILL_MAP[skill.prerequisite] : null;
+      setQuiz({
+        skill,
+        problem: generateFromConfig((prereq ?? skill).problemConfig),
+        picked: null,
+      });
+      return;
+    }
     if (skill.id !== playableId) return;
     startLesson(skill.id);
     router.push("/game");
+  };
+
+  const handleQuizAnswer = (choice: number) => {
+    if (!quiz || quiz.picked !== null) return;
+    setQuiz({ ...quiz, picked: choice });
+    const target = quiz.skill;
+    const correct = choice === quiz.problem.answer;
+    setTimeout(async () => {
+      setQuiz(null);
+      if (correct) {
+        await skipToSkill(target.id);
+      }
+    }, correct ? 700 : 1200);
   };
 
   const handleSwitchPlayer = () => {
@@ -127,7 +153,7 @@ export default function PathScreen() {
                         getNodeStyle(status, section.color, isPlayable),
                       ]}
                       onPress={() => handleNodePress(skill)}
-                      disabled={!isPlayable}
+                      disabled={status !== "locked" && !isPlayable}
                     >
                       <Text
                         style={[
@@ -177,6 +203,45 @@ export default function PathScreen() {
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
+
+      <Modal visible={quiz !== null} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          {quiz && (
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Skip to {quiz.skill.name}?</Text>
+              <Text style={styles.modalSub}>Answer this to unlock it</Text>
+              <Text style={styles.modalQuestion}>
+                {quiz.problem.question.includes("=") ? quiz.problem.question : `${quiz.problem.question} = ?`}
+              </Text>
+              <View style={styles.modalChoices}>
+                {quiz.problem.choices.map((choice, i) => {
+                  let bg = "#6C63FF";
+                  if (quiz.picked !== null) {
+                    if (choice === quiz.problem.answer) bg = "#22C55E";
+                    else if (choice === quiz.picked) bg = "#EF4444";
+                  }
+                  return (
+                    <Pressable
+                      key={i}
+                      style={[styles.modalChoice, { backgroundColor: bg }]}
+                      onPress={() => handleQuizAnswer(choice)}
+                      disabled={quiz.picked !== null}
+                    >
+                      <Text style={styles.modalChoiceText}>{choice}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              {quiz.picked !== null && quiz.picked !== quiz.problem.answer && (
+                <Text style={styles.modalWrong}>Not quite — keep practicing to unlock it!</Text>
+              )}
+              <Pressable onPress={() => setQuiz(null)} disabled={quiz.picked !== null}>
+                <Text style={styles.modalCancel}>Cancel</Text>
+              </Pressable>
+            </View>
+          )}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -315,6 +380,29 @@ const styles = StyleSheet.create({
   nodeNameLocked: {
     color: "#9CA3AF",
   },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  modalCard: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 24,
+    width: "100%",
+    maxWidth: 360,
+    alignItems: "center",
+  },
+  modalTitle: { fontSize: 20, fontWeight: "700", color: "#1E1B4B" },
+  modalSub: { fontSize: 14, color: "#6B7280", marginTop: 4 },
+  modalQuestion: { fontSize: 40, fontWeight: "700", color: "#1E1B4B", marginVertical: 20 },
+  modalChoices: { flexDirection: "row", flexWrap: "wrap", gap: 12, justifyContent: "center" },
+  modalChoice: { minWidth: 80, paddingVertical: 14, paddingHorizontal: 20, borderRadius: 14, alignItems: "center" },
+  modalChoiceText: { fontSize: 24, fontWeight: "700", color: "#fff" },
+  modalWrong: { marginTop: 16, color: "#EF4444", fontWeight: "600", textAlign: "center" },
+  modalCancel: { marginTop: 20, color: "#6B7280", fontSize: 16 },
   bottomSpacer: {
     height: 60,
   },
