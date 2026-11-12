@@ -54,6 +54,7 @@ type GameContextType = GameState & {
   nextProblem: () => void;
   isSessionOver: () => boolean;
   syncResults: () => Promise<void>;
+  skipToSkill: (skillId: string) => Promise<void>;
   clearProfile: () => void;
   getSkillStatus: (skillId: string) => SkillStatus;
   getSkillProgress: (skillId: string) => SkillProgress | null;
@@ -356,6 +357,47 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     state.profileStats,
   ]);
 
+  /** Unlock a skill by marking every unfinished skill in its prerequisite chain as passed (level 2). */
+  const skipToSkill = useCallback(
+    async (skillId: string) => {
+      if (!state.profile) return;
+      const profileId = state.profile.id;
+      const rows: { profile_id: string; skill_id: string; mastery_level: number; best_score: number; attempts: number; updated_at: string }[] = [];
+      let cur = SKILL_MAP[skillId]?.prerequisite ?? null;
+      while (cur) {
+        const existing = state.skillProgressMap[cur];
+        if ((existing?.mastery_level ?? 0) < 2) {
+          rows.push({
+            profile_id: profileId,
+            skill_id: cur,
+            mastery_level: 2,
+            best_score: existing?.best_score ?? 0,
+            attempts: existing?.attempts ?? 0,
+            updated_at: new Date().toISOString(),
+          });
+        }
+        cur = SKILL_MAP[cur]?.prerequisite ?? null;
+      }
+      if (rows.length === 0) return;
+
+      const { data } = await supabase
+        .from("skill_progress")
+        .upsert(rows, { onConflict: "profile_id,skill_id" })
+        .select();
+
+      setState((s) => {
+        const newMap = { ...s.skillProgressMap };
+        for (const row of rows) {
+          const saved = data?.find((d) => d.skill_id === row.skill_id);
+          newMap[row.skill_id] =
+            saved ?? { id: newMap[row.skill_id]?.id ?? "", ...row };
+        }
+        return { ...s, skillProgressMap: newMap };
+      });
+    },
+    [state.profile, state.skillProgressMap]
+  );
+
   const clearProfile = useCallback(() => {
     setState({
       profile: null,
@@ -380,6 +422,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         nextProblem,
         isSessionOver,
         syncResults,
+        skipToSkill,
         clearProfile,
         getSkillStatus,
         getSkillProgress,
