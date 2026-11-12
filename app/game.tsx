@@ -10,6 +10,9 @@ import ComparisonView from "./components/ComparisonView";
 import BubblePopView from "./components/BubblePopView";
 import EquationBuilderView from "./components/EquationBuilderView";
 import OrderingView from "./components/OrderingView";
+import LiteracyChoiceView from "./components/LiteracyChoiceView";
+import LiteracyPopView from "./components/LiteracyPopView";
+import SpellWordView from "./components/SpellWordView";
 
 type FeedbackState =
   | { kind: "multiple_choice"; index: number; result: "correct" | "wrong" }
@@ -17,6 +20,9 @@ type FeedbackState =
   | { kind: "bubble_pop"; result: "correct" | "wrong" }
   | { kind: "equation_builder"; result: "correct" | "wrong" }
   | { kind: "ordering"; result: "correct" | "wrong" }
+  | { kind: "literacy_choice"; index: number; result: "correct" | "wrong" }
+  | { kind: "literacy_pop"; result: "correct" | "wrong" }
+  | { kind: "spell_word"; result: "correct" | "wrong" }
   | null;
 
 const THINKING_IMAGES = [
@@ -87,6 +93,15 @@ export default function GameScreen() {
         case "ordering":
           fb = { kind: "ordering", result };
           break;
+        case "literacy_choice":
+          fb = { kind: "literacy_choice", index: feedbackMeta.index, result };
+          break;
+        case "literacy_pop":
+          fb = { kind: "literacy_pop", result };
+          break;
+        case "spell_word":
+          fb = { kind: "spell_word", result };
+          break;
       }
 
       setFeedback(fb);
@@ -98,7 +113,7 @@ export default function GameScreen() {
         setFeedback(null);
         setReactionImage(null);
         nextProblem();
-      }, result === "correct" ? 400 : 1000);
+      }, result === "correct" ? 400 : payload.kind.startsWith("literacy") || payload.kind === "spell_word" ? 1600 : 1000);
     },
     [feedback, submitAnswer, nextProblem]
   );
@@ -135,6 +150,7 @@ export default function GameScreen() {
       <View style={styles.questionArea}>
         <Image source={orcaSource} style={styles.orca} resizeMode="contain" />
         <ProblemView
+          key={problemIndex}
           problem={currentProblem}
           sectionColor={sectionColor}
           feedback={feedback}
@@ -199,6 +215,33 @@ function ProblemView({
           problem={problem}
           sectionColor={sectionColor}
           feedback={feedback?.kind === "ordering" ? feedback : null}
+          onSubmit={onSubmit}
+        />
+      );
+    case "literacy_choice":
+      return (
+        <LiteracyChoiceView
+          problem={problem}
+          sectionColor={sectionColor}
+          feedback={feedback?.kind === "literacy_choice" ? feedback : null}
+          onSubmit={onSubmit}
+        />
+      );
+    case "literacy_pop":
+      return (
+        <LiteracyPopView
+          problem={problem}
+          sectionColor={sectionColor}
+          feedback={feedback?.kind === "literacy_pop" ? feedback : null}
+          onSubmit={onSubmit}
+        />
+      );
+    case "spell_word":
+      return (
+        <SpellWordView
+          problem={problem}
+          sectionColor={sectionColor}
+          feedback={feedback?.kind === "spell_word" ? feedback : null}
           onSubmit={onSubmit}
         />
       );

@@ -10,9 +10,10 @@ import {
 import {
   SKILL_MAP,
   SKILL_SECTION_MAP,
-  ALL_SKILLS,
+  SKILLS_BY_SUBJECT,
   MASTERY_THRESHOLDS,
   type Skill,
+  type Subject,
 } from "./curriculum";
 
 // --- Submit payload discriminated union ---
@@ -22,7 +23,10 @@ export type SubmitPayload =
   | { kind: "comparison"; choice: "A" | "B" }
   | { kind: "bubble_pop"; selectedIndices: number[] }
   | { kind: "equation_builder"; arrangedTiles: string[] }
-  | { kind: "ordering"; selectedOrder: number[] };
+  | { kind: "ordering"; selectedOrder: number[] }
+  | { kind: "literacy_choice"; choice: string }
+  | { kind: "literacy_pop"; selectedIndices: number[] }
+  | { kind: "spell_word"; letters: string[] };
 
 // --- Generalized missed problem ---
 
@@ -45,6 +49,7 @@ type GameState = {
   sessionScore: number;
   sessionMissed: MissedProblem[];
   sessionPlan: SessionSlotKind[];
+  activeSubject: Subject;
 };
 
 type GameContextType = GameState & {
@@ -57,7 +62,8 @@ type GameContextType = GameState & {
   clearProfile: () => void;
   getSkillStatus: (skillId: string) => SkillStatus;
   getSkillProgress: (skillId: string) => SkillProgress | null;
-  getPlayableSkillId: () => string | null;
+  getPlayableSkillId: (subject: Subject) => string | null;
+  setActiveSubject: (subject: Subject) => void;
 };
 
 const PROBLEMS_PER_SESSION = 10;
@@ -97,6 +103,21 @@ function checkAnswer(problem: Problem, payload: SubmitPayload): { correct: boole
         payload.selectedOrder.every((val, idx) => val === problem.correctOrder[idx]);
       return { correct, description: "Order smallest to biggest", answerStr: problem.correctOrder.map(i => problem.items[i]).join(", ") };
     }
+    case "literacy_choice": {
+      const correct = payload.kind === "literacy_choice" && payload.choice === problem.answer;
+      return { correct, description: problem.review, answerStr: problem.answer };
+    }
+    case "literacy_pop": {
+      const answerStr = Array.from(new Set(problem.correctIndices.map((i) => problem.items[i]))).join(" ");
+      if (payload.kind !== "literacy_pop") return { correct: false, description: problem.review, answerStr };
+      const selected = new Set(payload.selectedIndices);
+      const correct = selected.size === problem.correctIndices.length && problem.correctIndices.every((i) => selected.has(i));
+      return { correct, description: problem.review, answerStr };
+    }
+    case "spell_word": {
+      const correct = payload.kind === "spell_word" && payload.letters.join("") === problem.word;
+      return { correct, description: `Spell ${problem.emoji}`, answerStr: problem.word };
+    }
   }
 }
 
@@ -111,6 +132,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     sessionScore: 0,
     sessionMissed: [],
     sessionPlan: [],
+    activeSubject: "math",
   });
 
   const selectProfile = useCallback(async (profile: Profile) => {
@@ -178,9 +200,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     [state.skillProgressMap]
   );
 
-  const getPlayableSkillId = useCallback((): string | null => {
+  const getPlayableSkillId = useCallback((subject: Subject): string | null => {
     let playable: string | null = null;
-    for (const skill of ALL_SKILLS) {
+    for (const skill of SKILLS_BY_SUBJECT[subject]) {
       const status = getSkillStatus(skill.id);
       if (status === "available" || status === "learning" || status === "practicing") {
         playable = skill.id;
@@ -193,7 +215,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     const skill = SKILL_MAP[skillId];
     if (!skill) return;
 
-    const plan = generateSessionPlan();
+    const plan = generateSessionPlan(skill.problemConfig);
     const problem = generateForSlot(plan[0], skill.problemConfig);
 
     setState((s) => ({
@@ -204,7 +226,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       sessionMissed: [],
       sessionPlan: plan,
       currentProblem: problem,
+      activeSubject: SKILL_SECTION_MAP[skillId]?.subject ?? s.activeSubject,
     }));
+  }, []);
+
+  const setActiveSubject = useCallback((subject: Subject) => {
+    setState((s) => ({ ...s, activeSubject: subject }));
   }, []);
 
   const submitAnswer = useCallback(
@@ -367,6 +394,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       sessionScore: 0,
       sessionMissed: [],
       sessionPlan: [],
+      activeSubject: "math",
     });
   }, []);
 
@@ -384,6 +412,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         getSkillStatus,
         getSkillProgress,
         getPlayableSkillId,
+        setActiveSubject,
       }}
     >
       {children}
