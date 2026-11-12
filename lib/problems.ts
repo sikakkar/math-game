@@ -1,3 +1,11 @@
+import {
+  generateLiteracyProblem,
+  generateLiteracySessionPlan,
+  type LiteracyProblem,
+  type LiteracySlotKind,
+} from "./literacy";
+import { isLiteracyConfig, type SkillConfig } from "./curriculum";
+
 // --- Problem type discriminated union ---
 
 export type MultipleChoiceProblem = {
@@ -36,6 +44,7 @@ export type OrderingProblem = {
 };
 
 export type Problem =
+  | LiteracyProblem
   | MultipleChoiceProblem
   | ComparisonProblem
   | BubblePopProblem
@@ -45,6 +54,7 @@ export type Problem =
 // --- Session slot types ---
 
 export type SessionSlotKind =
+  | LiteracySlotKind
   | "multiple_choice"
   | "missing_operand"
   | "comparison"
@@ -602,7 +612,8 @@ export function generateOrdering(config: ProblemConfig): OrderingProblem | Multi
 
 // --- Session planning ---
 
-export function generateSessionPlan(): SessionSlotKind[] {
+export function generateSessionPlan(config: SkillConfig): SessionSlotKind[] {
+  if (isLiteracyConfig(config)) return generateLiteracySessionPlan(config);
   const slots: SessionSlotKind[] = [
     "multiple_choice",
     "multiple_choice",
@@ -620,8 +631,11 @@ export function generateSessionPlan(): SessionSlotKind[] {
 
 export function generateForSlot(
   slotKind: SessionSlotKind,
-  config: ProblemConfig
+  config: SkillConfig
 ): Problem {
+  if (isLiteracyConfig(config)) {
+    return generateLiteracyProblem(slotKind as LiteracySlotKind, config);
+  }
   switch (slotKind) {
     case "multiple_choice":
       return generateFromConfig(config);
@@ -635,5 +649,7 @@ export function generateForSlot(
       return generateEquationBuilder(config);
     case "ordering":
       return generateOrdering(config);
+    default:
+      return generateFromConfig(config);
   }
 }

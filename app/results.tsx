@@ -67,7 +67,7 @@ export default function ResultsScreen() {
     .map((_, i) => (i < stars ? "\u2605" : "\u2606"))
     .join(" ");
 
-  const playableId = synced ? getPlayableSkillId() : null;
+  const playableId = synced && section ? getPlayableSkillId(section.subject) : null;
   const canPracticeAgain = synced && activeSkillId === playableId;
 
   const handlePracticeAgain = () => {

@@ -2,7 +2,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { View, Text, Pressable, StyleSheet, ScrollView, Image, Platform } from "react-native";
 import { useRouter, Redirect } from "expo-router";
 import { useGame, type SkillStatus } from "../lib/context";
-import { CURRICULUM, type Section, type Skill } from "../lib/curriculum";
+import { SUBJECTS, type Skill } from "../lib/curriculum";
 
 const POINTING_IMAGES = [
   require("../assets/orca/pointing.png"),
@@ -19,6 +19,8 @@ export default function PathScreen() {
     getSkillProgress,
     getPlayableSkillId,
     clearProfile,
+    activeSubject,
+    setActiveSubject,
   } = useGame();
   const router = useRouter();
   const scrollRef = useRef<ScrollView>(null);
@@ -53,11 +55,13 @@ export default function PathScreen() {
       scrollable.scrollTop = Math.max(0, offsetInContent - scrollable.clientHeight / 2);
     }, 300);
     return () => clearTimeout(timer);
-  }, [profile]);
+  }, [profile, activeSubject]);
 
   if (!profile) return <Redirect href="/" />;
 
-  const playableId = getPlayableSkillId();
+  const playableId = getPlayableSkillId(activeSubject);
+  const curriculum =
+    SUBJECTS.find((s) => s.id === activeSubject)?.curriculum ?? SUBJECTS[0].curriculum;
 
   const handleNodePress = (skill: Skill) => {
     if (skill.id !== playableId) return;
@@ -83,12 +87,33 @@ export default function PathScreen() {
         </Text>
       </View>
 
+      <View style={styles.tabs}>
+        {SUBJECTS.map((subject) => {
+          const selected = subject.id === activeSubject;
+          return (
+            <Pressable
+              key={subject.id}
+              accessibilityRole="tab"
+              accessibilityState={{ selected }}
+              style={[styles.tab, selected && styles.tabSelected]}
+              onPress={() => setActiveSubject(subject.id)}
+            >
+              <Text style={[styles.tabText, selected && styles.tabTextSelected]}>
+                {subject.id === "math" ? "🔢 " : "📖 "}
+                {subject.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
       <ScrollView
+        key={activeSubject}
         ref={scrollRef}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {CURRICULUM.map((section) => (
+        {curriculum.map((section) => (
           <View key={section.name} style={styles.section}>
             <View
               style={[
@@ -238,6 +263,33 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#F59E0B",
+  },
+  tabs: {
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: "center",
+    backgroundColor: "#F3F4F6",
+  },
+  tabSelected: {
+    backgroundColor: "#6C63FF",
+  },
+  tabText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#4B5563",
+  },
+  tabTextSelected: {
+    color: "#fff",
   },
   scrollContent: {
     paddingVertical: 24,

@@ -40,3 +40,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Playwright MCP session files (may hold login tokens)
+.playwright-mcp/

@@ -1,3 +1,17 @@
+import type { LiteracyConfig } from "./literacy";
+
+export type Subject = "math" | "reading";
+
+export type SkillConfig = ProblemConfig | LiteracyConfig;
+
+export function isLiteracyConfig(config: SkillConfig): config is LiteracyConfig {
+  return (
+    config.type === "letter_sounds" ||
+    config.type === "words" ||
+    config.type === "sight_words"
+  );
+}
+
 export type ProblemType =
   | "addition"
   | "subtraction"
@@ -22,11 +36,12 @@ export type Skill = {
   name: string;
   icon: string;
   prerequisite: string | null;
-  problemConfig: ProblemConfig;
+  problemConfig: SkillConfig;
 };
 
 export type Section = {
   name: string;
+  subject: Subject;
   color: string;
   skills: Skill[];
 };
@@ -37,8 +52,9 @@ export const MASTERY_THRESHOLDS: Record<number, number> = {
   3: 9,
 };
 
-export const CURRICULUM: Section[] = [
+export const MATH_CURRICULUM: Section[] = [
   {
+    subject: "math",
     name: "Addition Basics",
     color: "#6C63FF",
     skills: [
@@ -93,6 +109,7 @@ export const CURRICULUM: Section[] = [
     ],
   },
   {
+    subject: "math",
     name: "Subtraction Basics",
     color: "#8B5CF6",
     skills: [
@@ -132,6 +149,7 @@ export const CURRICULUM: Section[] = [
     ],
   },
   {
+    subject: "math",
     name: "Add & Subtract Mix",
     color: "#7C3AED",
     skills: [
@@ -162,6 +180,7 @@ export const CURRICULUM: Section[] = [
     ],
   },
   {
+    subject: "math",
     name: "Bigger Numbers",
     color: "#4F46E5",
     skills: [
@@ -223,6 +242,7 @@ export const CURRICULUM: Section[] = [
     ],
   },
   {
+    subject: "math",
     name: "Multiplication",
     color: "#FF8C42",
     skills: [
@@ -277,6 +297,7 @@ export const CURRICULUM: Section[] = [
     ],
   },
   {
+    subject: "math",
     name: "Times Tables",
     color: "#F59E0B",
     skills: [
@@ -390,6 +411,7 @@ export const CURRICULUM: Section[] = [
     ],
   },
   {
+    subject: "math",
     name: "Division",
     color: "#EF4444",
     skills: [
@@ -454,11 +476,113 @@ export const CURRICULUM: Section[] = [
   },
 ];
 
+const letterSkill = (letters: string[], prerequisite: string | null): Skill => ({
+  id: `lit_letters_${letters.join("")}`,
+  name: letters.join(" "),
+  icon: letters.length > 4 ? `${letters.slice(0, 3).join("")}…` : letters.join(""),
+  prerequisite,
+  problemConfig: { type: "letter_sounds", letters },
+});
+
+/**
+ * Reading path: letter sounds (taught in the common "s a t p i n" order, so kids
+ * can blend real words early) → CVC words by vowel → digraphs → blends → sight words.
+ */
+export const READING_CURRICULUM: Section[] = [
+  {
+    subject: "reading",
+    name: "Letter Sounds",
+    color: "#10B981",
+    skills: [
+      letterSkill(["s", "a", "t", "p"], null),
+      letterSkill(["i", "n", "m", "d"], "lit_letters_satp"),
+      letterSkill(["g", "o", "c", "k"], "lit_letters_inmd"),
+      letterSkill(["e", "u", "r", "h"], "lit_letters_gock"),
+      letterSkill(["b", "f", "l", "j"], "lit_letters_eurh"),
+      letterSkill(["v", "w", "x", "y", "z", "q"], "lit_letters_bflj"),
+      {
+        id: "lit_letters_all",
+        name: "All Sounds",
+        icon: "a–z",
+        prerequisite: "lit_letters_vwxyzq",
+        problemConfig: { type: "letter_sounds", letters: "abcdefghijklmnopqrstuvwxyz".split("") },
+      },
+    ],
+  },
+  {
+    subject: "reading",
+    name: "CVC Words",
+    color: "#0EA5E9",
+    skills: [
+      { id: "lit_cvc_a", name: "Short a", icon: "cat", prerequisite: "lit_letters_all", problemConfig: { type: "words", sets: ["cvc_a"] } },
+      { id: "lit_cvc_i", name: "Short i", icon: "pig", prerequisite: "lit_cvc_a", problemConfig: { type: "words", sets: ["cvc_i"] } },
+      { id: "lit_cvc_o", name: "Short o", icon: "dog", prerequisite: "lit_cvc_i", problemConfig: { type: "words", sets: ["cvc_o"] } },
+      { id: "lit_cvc_e", name: "Short e", icon: "hen", prerequisite: "lit_cvc_o", problemConfig: { type: "words", sets: ["cvc_e"] } },
+      { id: "lit_cvc_u", name: "Short u", icon: "sun", prerequisite: "lit_cvc_e", problemConfig: { type: "words", sets: ["cvc_u"] } },
+      {
+        id: "lit_cvc_mix",
+        name: "CVC Mix",
+        icon: "a e i",
+        prerequisite: "lit_cvc_u",
+        problemConfig: { type: "words", sets: ["cvc_a", "cvc_i", "cvc_o", "cvc_e", "cvc_u"] },
+      },
+    ],
+  },
+  {
+    subject: "reading",
+    name: "Sight Words",
+    color: "#F43F5E",
+    skills: [
+      { id: "lit_sight_1", name: "Sight Words 1", icon: "the", prerequisite: "lit_cvc_mix", problemConfig: { type: "sight_words", sets: ["sight_1"] } },
+      { id: "lit_sight_2", name: "Sight Words 2", icon: "said", prerequisite: "lit_sight_1", problemConfig: { type: "sight_words", sets: ["sight_2"] } },
+    ],
+  },
+  {
+    subject: "reading",
+    name: "Digraphs",
+    color: "#8B5CF6",
+    skills: [
+      { id: "lit_dig_sh", name: "sh words", icon: "sh", prerequisite: "lit_sight_2", problemConfig: { type: "words", sets: ["digraph_sh"] } },
+      { id: "lit_dig_ch", name: "ch words", icon: "ch", prerequisite: "lit_dig_sh", problemConfig: { type: "words", sets: ["digraph_ch"] } },
+      { id: "lit_dig_th_ck", name: "th & ck", icon: "th", prerequisite: "lit_dig_ch", problemConfig: { type: "words", sets: ["digraph_th_ck"] } },
+    ],
+  },
+  {
+    subject: "reading",
+    name: "Blends",
+    color: "#F59E0B",
+    skills: [
+      { id: "lit_blend_start", name: "Start Blends", icon: "fr", prerequisite: "lit_dig_th_ck", problemConfig: { type: "words", sets: ["blend_start"] } },
+      { id: "lit_blend_end", name: "End Blends", icon: "nd", prerequisite: "lit_blend_start", problemConfig: { type: "words", sets: ["blend_end"] } },
+      {
+        id: "lit_review",
+        name: "Big Review",
+        icon: "📚",
+        prerequisite: "lit_blend_end",
+        problemConfig: { type: "words", sets: ["cvc_a", "cvc_i", "cvc_o", "cvc_e", "cvc_u", "digraph_sh", "digraph_ch", "digraph_th_ck", "blend_start", "blend_end"] },
+      },
+    ],
+  },
+];
+
+export const SUBJECTS: { id: Subject; label: string; curriculum: Section[] }[] = [
+  { id: "math", label: "Math", curriculum: MATH_CURRICULUM },
+  { id: "reading", label: "Reading", curriculum: READING_CURRICULUM },
+];
+
+/** Every section, math and reading. */
+export const CURRICULUM: Section[] = [...MATH_CURRICULUM, ...READING_CURRICULUM];
+
 export const ALL_SKILLS: Skill[] = CURRICULUM.flatMap((s) => s.skills);
 
 export const SKILL_MAP: Record<string, Skill> = Object.fromEntries(
   ALL_SKILLS.map((s) => [s.id, s])
 );
+
+export const SKILLS_BY_SUBJECT: Record<Subject, Skill[]> = {
+  math: MATH_CURRICULUM.flatMap((s) => s.skills),
+  reading: READING_CURRICULUM.flatMap((s) => s.skills),
+};
 
 export const SKILL_SECTION_MAP: Record<string, Section> = Object.fromEntries(
   CURRICULUM.flatMap((section) =>
