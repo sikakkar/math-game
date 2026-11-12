@@ -1,8 +1,8 @@
-import { useEffect, useRef, useMemo } from "react";
-import { View, Text, Pressable, StyleSheet, ScrollView, Image, Platform } from "react-native";
+import { useEffect, useRef, useMemo, useState } from "react";
+import { View, Text, Pressable, StyleSheet, ScrollView, Image, Platform, Modal } from "react-native";
 import { useRouter, Redirect } from "expo-router";
 import { useGame, type SkillStatus } from "../lib/context";
-import { CURRICULUM, type Section, type Skill } from "../lib/curriculum";
+import { CURRICULUM, SKILL_MAP, SKILL_SECTION_MAP, type Skill } from "../lib/curriculum";
 
 const POINTING_IMAGES = [
   require("../assets/orca/pointing.png"),
@@ -18,9 +18,12 @@ export default function PathScreen() {
     getSkillStatus,
     getSkillProgress,
     getPlayableSkillId,
+    getSkipQuizPlan,
+    startSkipQuiz,
     clearProfile,
   } = useGame();
   const router = useRouter();
+  const [skipTargetId, setSkipTargetId] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
   const pointingImage = useMemo(
@@ -60,9 +63,27 @@ export default function PathScreen() {
   const playableId = getPlayableSkillId();
 
   const handleNodePress = (skill: Skill) => {
-    if (skill.id !== playableId) return;
-    startLesson(skill.id);
-    router.push("/game");
+    if (skill.id === playableId) {
+      startLesson(skill.id);
+      router.push("/game");
+      return;
+    }
+    if (getSkillStatus(skill.id) === "locked") {
+      setSkipTargetId(skill.id);
+    }
+  };
+
+  const skipPlan = skipTargetId ? getSkipQuizPlan(skipTargetId) : null;
+  const skipTarget = skipTargetId ? SKILL_MAP[skipTargetId] : null;
+  const skipColor = skipTargetId
+    ? SKILL_SECTION_MAP[skipTargetId]?.color ?? "#6C63FF"
+    : "#6C63FF";
+
+  const handleStartSkipQuiz = () => {
+    if (!skipTargetId) return;
+    const started = startSkipQuiz(skipTargetId);
+    setSkipTargetId(null);
+    if (started) router.push("/game");
   };
 
   const handleSwitchPlayer = () => {
@@ -88,6 +109,10 @@ export default function PathScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        <Text style={styles.skipHint}>
+          Already know it? Tap a 🔒 level to jump ahead with a quick quiz.
+        </Text>
+
         {CURRICULUM.map((section) => (
           <View key={section.name} style={styles.section}>
             <View
@@ -127,7 +152,12 @@ export default function PathScreen() {
                         getNodeStyle(status, section.color, isPlayable),
                       ]}
                       onPress={() => handleNodePress(skill)}
-                      disabled={!isPlayable}
+                      disabled={!isPlayable && status !== "locked"}
+                      accessibilityLabel={
+                        status === "locked"
+                          ? `Skip ahead to ${skill.name}`
+                          : skill.name
+                      }
                     >
                       <Text
                         style={[
@@ -177,6 +207,46 @@ export default function PathScreen() {
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
+
+      <Modal
+        visible={skipPlan !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSkipTargetId(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          {skipPlan && skipTarget && (
+            <View style={styles.modalCard}>
+              <Text style={[styles.modalTitle, { color: skipColor }]}>
+                Jump to {skipTarget.name}?
+              </Text>
+              <Text style={styles.modalBody}>
+                This skips {skipPlan.skippedSkillIds.length}{" "}
+                {skipPlan.skippedSkillIds.length === 1 ? "level" : "levels"}.
+                Answer {skipPlan.questionSkillIds.length} quick questions from
+                them to show you're ready.
+              </Text>
+              <Text style={styles.modalBody}>
+                Get {skipPlan.passScore} right to unlock {skipTarget.name}!
+              </Text>
+              <Pressable
+                style={[styles.modalButton, { backgroundColor: skipColor }]}
+                onPress={handleStartSkipQuiz}
+              >
+                <Text style={styles.modalButtonText}>Take the quiz</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.modalButton, styles.modalButtonOutline]}
+                onPress={() => setSkipTargetId(null)}
+              >
+                <Text style={[styles.modalButtonText, { color: "#6B7280" }]}>
+                  Not now
+                </Text>
+              </Pressable>
+            </View>
+          )}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -314,6 +384,53 @@ const styles = StyleSheet.create({
   },
   nodeNameLocked: {
     color: "#9CA3AF",
+  },
+  skipHint: {
+    fontSize: 13,
+    color: "#6B7280",
+    textAlign: "center",
+    marginHorizontal: 24,
+    marginBottom: 16,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(17, 24, 39, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  modalCard: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 24,
+    width: "100%",
+    maxWidth: 340,
+    gap: 12,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  modalBody: {
+    fontSize: 16,
+    color: "#374151",
+    textAlign: "center",
+  },
+  modalButton: {
+    borderRadius: 16,
+    padding: 16,
+    alignItems: "center",
+  },
+  modalButtonOutline: {
+    backgroundColor: "transparent",
+    borderWidth: 2,
+    borderColor: "#D1D5DB",
+  },
+  modalButtonText: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#fff",
   },
   bottomSpacer: {
     height: 60,

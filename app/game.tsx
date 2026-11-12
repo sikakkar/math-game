@@ -50,6 +50,8 @@ export default function GameScreen() {
     currentProblem,
     problemIndex,
     sessionScore,
+    sessionLength,
+    skipQuiz,
     submitAnswer,
     nextProblem,
     isSessionOver,
@@ -122,10 +124,10 @@ export default function GameScreen() {
     <View style={styles.container}>
       <View style={styles.topBar}>
         <Text style={[styles.topText, { color: sectionColor }]}>
-          {skill?.name ?? "Practice"}
+          {skipQuiz ? `Jump to ${skill?.name}` : skill?.name ?? "Practice"}
         </Text>
         <Text style={styles.topText}>
-          {problemIndex + 1} / 10
+          {problemIndex + 1} / {sessionLength}
         </Text>
         <Text style={styles.topText}>
           {sessionScore} correct

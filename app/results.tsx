@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { View, Text, Pressable, StyleSheet, ScrollView, Image } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, Redirect } from "expo-router";
 import { useGame } from "../lib/context";
 import { SKILL_MAP, SKILL_SECTION_MAP, MASTERY_THRESHOLDS } from "../lib/curriculum";
 
@@ -24,6 +24,123 @@ const MASTERY_LABELS: Record<number, string> = {
 };
 
 export default function ResultsScreen() {
+  const { skipQuiz } = useGame();
+  // Freeze the mode on mount: starting the next session from this screen
+  // changes skipQuiz before navigation finishes, and remounting the other
+  // variant would sync a second time.
+  const [isSkipQuiz] = useState(skipQuiz !== null);
+  return isSkipQuiz ? <SkipQuizResults /> : <LessonResults />;
+}
+
+function SkipQuizResults() {
+  const {
+    sessionScore,
+    sessionLength,
+    sessionMissed,
+    skipQuiz,
+    syncResults,
+    startLesson,
+    startSkipQuiz,
+  } = useGame();
+  const router = useRouter();
+  const [synced, setSynced] = useState(false);
+  // Keep the quiz we just finished even after a new session starts
+  const [quiz] = useState(skipQuiz);
+  const [score] = useState(sessionScore);
+  const [total] = useState(sessionLength);
+
+  useEffect(() => {
+    if (!synced) syncResults().then(() => setSynced(true));
+  }, [synced, syncResults]);
+
+  const passed = quiz !== null && score >= quiz.passScore;
+  const orcaImage = useMemo(() => {
+    const pool = passed ? CELEBRATING_IMAGES : ENCOURAGING_IMAGES;
+    return pool[Math.floor(Math.random() * pool.length)];
+  }, [passed]);
+
+  if (!quiz) return <Redirect href="/path" />;
+
+  const target = SKILL_MAP[quiz.targetSkillId];
+  const sectionColor = SKILL_SECTION_MAP[quiz.targetSkillId]?.color ?? "#6C63FF";
+  const skippedCount = quiz.skippedSkillIds.length;
+
+  const handleStartTarget = () => {
+    startLesson(quiz.targetSkillId);
+    router.replace("/game");
+  };
+
+  const handleTryAgain = () => {
+    if (startSkipQuiz(quiz.targetSkillId)) router.replace("/game");
+  };
+
+  return (
+    <ScrollView contentContainerStyle={styles.container} bounces={false}>
+      <Image source={orcaImage} style={styles.orca} resizeMode="contain" />
+
+      <Text style={[styles.skillName, { color: sectionColor }]}>
+        {passed ? "You're ready!" : "Not quite yet"}
+      </Text>
+
+      <Text style={styles.scoreText}>
+        {score} / {total} correct
+      </Text>
+
+      <View style={styles.masterySection}>
+        {passed ? (
+          <Text style={styles.advanceText} testID="skip-quiz-passed">
+            You jumped ahead {skippedCount} {skippedCount === 1 ? "level" : "levels"}.{"\n"}
+            {target?.name} is unlocked!
+          </Text>
+        ) : (
+          <Text style={styles.masteryLabel} testID="skip-quiz-failed">
+            You needed {quiz.passScore} to jump to {target?.name}.{"\n"}
+            Keep practicing and try again soon!
+          </Text>
+        )}
+      </View>
+
+      {sessionMissed.length > 0 && (
+        <View style={styles.missedSection}>
+          <Text style={styles.missedTitle}>Review these:</Text>
+          {sessionMissed.map((m, i) => (
+            <Text key={i} style={styles.missedItem}>
+              {m.description} → {m.answer}
+            </Text>
+          ))}
+        </View>
+      )}
+
+      <View style={styles.buttons}>
+        {passed ? (
+          <Pressable
+            style={[styles.button, { backgroundColor: sectionColor }, !synced && styles.buttonDisabled]}
+            onPress={handleStartTarget}
+            disabled={!synced}
+          >
+            <Text style={styles.buttonText}>Start {target?.name}</Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            style={[styles.button, { backgroundColor: sectionColor }, !synced && styles.buttonDisabled]}
+            onPress={handleTryAgain}
+            disabled={!synced}
+          >
+            <Text style={styles.buttonText}>Try Again</Text>
+          </Pressable>
+        )}
+        <Pressable
+          style={[styles.button, styles.buttonOutline]}
+          onPress={() => router.replace("/path")}
+        >
+          <Text style={[styles.buttonText, { color: "#6B7280" }]}>Back to Path</Text>
+        </Pressable>
+      </View>
+    </ScrollView>
+  );
+}
+
+function LessonResults() {
   const {
     sessionScore,
     sessionMissed,
@@ -205,6 +322,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   masteryLabel: {
+    textAlign: "center",
     fontSize: 18,
     fontWeight: "600",
     color: "#374151",
@@ -230,6 +348,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#22C55E",
     marginTop: 12,
+    textAlign: "center",
   },
   statsRow: {
     flexDirection: "row",
@@ -281,6 +400,9 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 18,
     alignItems: "center",
+  },
+  buttonDisabled: {
+    opacity: 0.5,
   },
   buttonOutline: {
     backgroundColor: "transparent",
