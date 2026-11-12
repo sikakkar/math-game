@@ -3,6 +3,7 @@ import { View, Text, Pressable, StyleSheet, ScrollView, Image } from "react-nati
 import { useRouter } from "expo-router";
 import { useGame } from "../lib/context";
 import { SKILL_MAP, SKILL_SECTION_MAP, MASTERY_THRESHOLDS } from "../lib/curriculum";
+import { useIsWide } from "../lib/layout";
 
 const CELEBRATING_IMAGES = [
   require("../assets/orca/celebrating.png"),
@@ -35,6 +36,7 @@ export default function ResultsScreen() {
     getPlayableSkillId,
   } = useGame();
   const router = useRouter();
+  const isWide = useIsWide();
   const [synced, setSynced] = useState(false);
   const [prevLevel, setPrevLevel] = useState<number | null>(null);
 
@@ -81,11 +83,24 @@ export default function ResultsScreen() {
     router.replace("/path");
   };
 
+  const missedList = sessionMissed.length > 0 && (
+    <View style={[styles.missedSection, isWide && styles.missedSectionWide]}>
+      <Text style={styles.missedTitle}>Review these:</Text>
+      {sessionMissed.map((m, i) => (
+        <Text key={i} style={styles.missedItem}>
+          {m.description} → {m.answer}
+        </Text>
+      ))}
+    </View>
+  );
+
   return (
     <ScrollView
       contentContainerStyle={styles.container}
       bounces={false}
     >
+      <View style={[styles.layout, isWide && styles.layoutWide]}>
+      <View style={[styles.summary, isWide && styles.summaryWide]}>
       <Image source={orcaImage} style={styles.orca} resizeMode="contain" />
 
       <Text style={styles.stars}>{starDisplay}</Text>
@@ -138,16 +153,7 @@ export default function ResultsScreen() {
         </View>
       </View>
 
-      {sessionMissed.length > 0 && (
-        <View style={styles.missedSection}>
-          <Text style={styles.missedTitle}>Review these:</Text>
-          {sessionMissed.map((m, i) => (
-            <Text key={i} style={styles.missedItem}>
-              {m.description} → {m.answer}
-            </Text>
-          ))}
-        </View>
-      )}
+      {!isWide && missedList}
 
       <View style={styles.buttons}>
         {canPracticeAgain && (
@@ -167,6 +173,10 @@ export default function ResultsScreen() {
           </Text>
         </Pressable>
       </View>
+      </View>
+
+      {isWide && missedList}
+      </View>
     </ScrollView>
   );
 }
@@ -178,6 +188,24 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: 32,
+  },
+  layout: {
+    width: "100%",
+    alignItems: "center",
+  },
+  layoutWide: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "center",
+    gap: 48,
+    maxWidth: 960,
+  },
+  summary: {
+    width: "100%",
+    alignItems: "center",
+  },
+  summaryWide: {
+    width: 360,
   },
   orca: {
     width: 200,
@@ -260,6 +288,13 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 320,
     marginBottom: 32,
+  },
+  missedSectionWide: {
+    maxWidth: 420,
+    flex: 1,
+    marginTop: 0,
+    marginBottom: 0,
+    alignSelf: "center",
   },
   missedTitle: {
     fontSize: 18,

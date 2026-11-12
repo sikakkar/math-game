@@ -1,6 +1,7 @@
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import type { ComparisonProblem } from "../../lib/problems";
 import type { SubmitPayload } from "../../lib/context";
+import { useIsWide } from "../../lib/layout";
 
 type Feedback = { choice: "A" | "B"; result: "correct" | "wrong" } | null;
 
@@ -12,6 +13,7 @@ type Props = {
 };
 
 export default function ComparisonView({ problem, sectionColor, feedback, onSubmit }: Props) {
+  const isWide = useIsWide();
   const getColor = (side: "A" | "B") => {
     if (!feedback) return sectionColor;
     if (feedback.choice === side) {
@@ -27,7 +29,7 @@ export default function ComparisonView({ problem, sectionColor, feedback, onSubm
   return (
     <>
       <Text style={styles.title}>Which is bigger?</Text>
-      <View style={styles.buttonsContainer}>
+      <View style={[styles.buttonsContainer, isWide && { paddingBottom: 0 }]}>
         <Pressable
           style={[styles.expressionButton, { backgroundColor: getColor("A") }]}
           onPress={() => onSubmit({ kind: "comparison", choice: "A" }, { choice: "A" })}

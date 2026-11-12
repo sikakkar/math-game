@@ -1,6 +1,7 @@
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import type { MultipleChoiceProblem } from "../../lib/problems";
 import type { SubmitPayload } from "../../lib/context";
+import { useIsWide } from "../../lib/layout";
 
 type Feedback = { index: number; result: "correct" | "wrong" } | null;
 
@@ -12,12 +13,13 @@ type Props = {
 };
 
 export default function MultipleChoiceView({ problem, sectionColor, feedback, onSubmit }: Props) {
+  const isWide = useIsWide();
   return (
     <>
       <Text style={styles.question}>
         {problem.question.includes("=") ? problem.question : `${problem.question} = ?`}
       </Text>
-      <View style={styles.choicesGrid}>
+      <View style={[styles.choicesGrid, isWide && { paddingBottom: 0 }]}>
         {problem.choices.map((choice, i) => {
           let bgColor = sectionColor;
           if (feedback) {
@@ -52,6 +54,7 @@ const styles = StyleSheet.create({
     fontSize: 56,
     fontWeight: "700",
     color: "#1E1B4B",
+    marginBottom: 16,
   },
   choicesGrid: {
     flexDirection: "row",

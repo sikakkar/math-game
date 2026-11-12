@@ -4,6 +4,7 @@ import { useRouter, Redirect } from "expo-router";
 import { useGame, type SubmitPayload } from "../lib/context";
 import { SKILL_MAP, SKILL_SECTION_MAP } from "../lib/curriculum";
 import type { Problem } from "../lib/problems";
+import { useIsWide, CONTENT_MAX_WIDTH } from "../lib/layout";
 
 import MultipleChoiceView from "./components/MultipleChoiceView";
 import ComparisonView from "./components/ComparisonView";
@@ -55,6 +56,7 @@ export default function GameScreen() {
     isSessionOver,
   } = useGame();
   const router = useRouter();
+  const isWide = useIsWide();
   const [feedback, setFeedback] = useState<FeedbackState>(null);
   const [reactionImage, setReactionImage] = useState<any>(null);
 
@@ -119,8 +121,9 @@ export default function GameScreen() {
   const orcaSource = reactionImage ?? thinkingImage;
 
   return (
-    <View style={styles.container}>
-      <View style={styles.topBar}>
+    <View style={[styles.container, isWide && styles.containerWide]}>
+      <View style={[styles.inner, isWide && styles.innerWide]}>
+      <View style={[styles.topBar, isWide && styles.topBarWide]}>
         <Text style={[styles.topText, { color: sectionColor }]}>
           {skill?.name ?? "Practice"}
         </Text>
@@ -132,14 +135,19 @@ export default function GameScreen() {
         </Text>
       </View>
 
-      <View style={styles.questionArea}>
-        <Image source={orcaSource} style={styles.orca} resizeMode="contain" />
+      <View style={[styles.questionArea, isWide && styles.questionAreaWide]}>
+        <Image
+          source={orcaSource}
+          style={[styles.orca, isWide && styles.orcaWide]}
+          resizeMode="contain"
+        />
         <ProblemView
           problem={currentProblem}
           sectionColor={sectionColor}
           feedback={feedback}
           onSubmit={handleSubmit}
         />
+      </View>
       </View>
     </View>
   );
@@ -212,10 +220,26 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingHorizontal: 24,
   },
+  containerWide: {
+    paddingTop: 40,
+    paddingBottom: 40,
+  },
+  inner: {
+    flex: 1,
+  },
+  innerWide: {
+    width: "100%",
+    maxWidth: CONTENT_MAX_WIDTH,
+    alignSelf: "center",
+  },
   topBar: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 40,
+  },
+  topBarWide: {
+    marginBottom: 24,
+    paddingHorizontal: 8,
   },
   topText: {
     fontSize: 16,
@@ -227,9 +251,28 @@ const styles = StyleSheet.create({
     height: 100,
     marginBottom: 16,
   },
+  orcaWide: {
+    width: 180,
+    height: 120,
+  },
   questionArea: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  questionAreaWide: {
+    flexGrow: 0,
+    flexShrink: 0,
+    flexBasis: "auto",
+    marginTop: "auto",
+    marginBottom: "auto",
+    backgroundColor: "#fff",
+    borderRadius: 28,
+    paddingVertical: 40,
+    paddingHorizontal: 40,
+    shadowColor: "#1E1B4B",
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 8 },
   },
 });
