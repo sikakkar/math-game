@@ -17,13 +17,31 @@ export type ProblemConfig = {
   };
 };
 
-export type Skill = {
+export type Subject = "math" | "reading";
+
+export type ReadingConfig = {
+  /** Words with pictures (keys of WORD_EMOJI) this skill practises. */
+  words: string[];
+  /** Sounds this skill focuses on; one is blanked out in "missing sound" questions. */
+  focus: string[];
+  /** Sounds offered as choices / decoy tiles (the right answer is always excluded). */
+  altSounds: string[];
+  /** Extra decodable words (no picture) used for rhymes and look-alike choices. */
+  extras: string[];
+  /** Every word taught so far on the reading path (filled in below). */
+  known: string[];
+};
+
+type SkillBase = {
   id: string;
   name: string;
   icon: string;
   prerequisite: string | null;
-  problemConfig: ProblemConfig;
 };
+
+export type MathSkill = SkillBase & { problemConfig: ProblemConfig; readingConfig?: undefined };
+export type ReadingSkill = SkillBase & { readingConfig: ReadingConfig; problemConfig?: undefined };
+export type Skill = MathSkill | ReadingSkill;
 
 export type Section = {
   name: string;
@@ -454,14 +472,171 @@ export const CURRICULUM: Section[] = [
   },
 ];
 
-export const ALL_SKILLS: Skill[] = CURRICULUM.flatMap((s) => s.skills);
+// --- Early literacy ---
+
+const VOWELS = ["a", "e", "i", "o", "u"];
+const DIGRAPHS = ["sh", "ch", "th", "ck"];
+const VOWEL_TEAMS = ["ee", "ea", "ai", "oa"];
+
+function reading(
+  words: string,
+  focus: string[],
+  altSounds: string[],
+  extras: string
+): ReadingConfig {
+  return {
+    words: words.split(" "),
+    focus,
+    altSounds,
+    extras: extras.split(" "),
+    known: [],
+  };
+}
+
+function combine(...configs: ReadingConfig[]): ReadingConfig {
+  const uniq = (xs: string[]) => Array.from(new Set(xs));
+  const focus = uniq(configs.flatMap((c) => c.focus));
+  return {
+    words: uniq(configs.flatMap((c) => c.words)),
+    focus,
+    altSounds: focus,
+    extras: uniq(configs.flatMap((c) => c.extras)),
+    known: [],
+  };
+}
+
+const R = {
+  a: reading("cat bat hat rat map van cap bag can man ram pan", ["a"], VOWELS,
+    "sat mat pat fat tap nap lap sap ban tan dad sad had bad rag tag wag jam dam"),
+  i: reading("pig pin lip kid bin zip", ["i"], VOWELS,
+    "big dig fig wig sip tip hip dip win fin tin kit sit hit lid did hid"),
+  o: reading("dog log pot box fox hot cop dot", ["o"], VOWELS,
+    "hog jog fog cot not got hop mop top pop rod nod"),
+  u: reading("sun bus cup bug hug nut hut run tub", ["u"], VOWELS,
+    "fun bun gun pup cut but rug mug dug jug cub rub"),
+  e: reading("bed hen net pen web jet leg ten red", ["e"], VOWELS,
+    "fed led wed men bet get let pet set wet peg beg"),
+  sh: reading("ship shell fish dish shop cash", ["sh"], DIGRAPHS,
+    "wish mash rash dash hop top sell bell"),
+  ch: reading("chick chess check chat lunch inch", ["ch"], DIGRAPHS,
+    "chin chip much such munch bunch punch hat pick neck"),
+  th: reading("bath thumb think math", ["th"], DIGRAPHS,
+    "path with thin pink sink wink"),
+  ck: reading("duck sock rock lock lick", ["ck"], DIGRAPHS,
+    "luck tuck puck dock tick kick pick sick"),
+  startBlends: reading("frog crab drum flag sled plug swim grin clap brick truck clock",
+    ["fr", "cr", "dr", "fl", "sl", "pl", "sw", "gr", "cl", "br", "tr"],
+    ["fr", "cr", "dr", "fl", "sl", "pl", "sw", "gr", "cl", "br", "tr", "bl", "st", "sn"],
+    "log jog grab plum bag rag bed bug mug him trim pin win thin map cap snap stick trick luck sock"),
+  endBlends: reading("tent hand milk gift ant mask sink vest fist",
+    ["nt", "nd", "lk", "ft", "sk", "nk", "st"],
+    ["nt", "nd", "lk", "ft", "sk", "nk", "st", "mp"],
+    "bent went sent sand band land silk lift sift pant plant task ask pink wink best nest rest test list mist"),
+  aeie: reading("cake game snake grape plane skate kite bike dice smile mice", ["a", "i"], VOWELS,
+    "lake bake make rake take same name came tape cape cane lane gate late date bite white like hike nice rice mile tile"),
+  oeue: reading("rose bone nose rope home globe cube tune mute", ["o", "u"], VOWELS,
+    "hose close cone stone dome hope slope robe tube dune june cute"),
+  eeea: reading("bee tree feet sheep seed queen teeth leaf tea beach peach seal meat",
+    ["ee", "ea"], VOWEL_TEAMS,
+    "see free meet sweet keep deep feed need weed green seen sea pea reach teach meal deal real beat heat seat eat"),
+  aioa: reading("rain snail mail train nail paint boat goat coat soap road",
+    ["ai", "oa"], VOWEL_TEAMS,
+    "pain main chain brain tail sail pail faint float moat load toad"),
+};
+
+export const READING_CURRICULUM: Section[] = [
+  {
+    name: "CVC Words",
+    color: "#0EA5E9",
+    skills: [
+      { id: "read_cvc_a", name: "Short a", icon: "cat", prerequisite: null, readingConfig: R.a },
+      { id: "read_cvc_i", name: "Short i", icon: "pig", prerequisite: "read_cvc_a", readingConfig: R.i },
+      { id: "read_cvc_o", name: "Short o", icon: "dog", prerequisite: "read_cvc_i", readingConfig: R.o },
+      { id: "read_cvc_u", name: "Short u", icon: "sun", prerequisite: "read_cvc_o", readingConfig: R.u },
+      { id: "read_cvc_e", name: "Short e", icon: "bed", prerequisite: "read_cvc_u", readingConfig: R.e },
+      { id: "read_cvc_mix", name: "CVC Mix", icon: "a·e·i", prerequisite: "read_cvc_e",
+        readingConfig: combine(R.a, R.i, R.o, R.u, R.e) },
+    ],
+  },
+  {
+    name: "Digraphs",
+    color: "#14B8A6",
+    skills: [
+      { id: "read_sh", name: "sh", icon: "sh", prerequisite: "read_cvc_mix", readingConfig: R.sh },
+      { id: "read_ch", name: "ch", icon: "ch", prerequisite: "read_sh", readingConfig: R.ch },
+      { id: "read_th", name: "th", icon: "th", prerequisite: "read_ch", readingConfig: R.th },
+      { id: "read_ck", name: "ck", icon: "ck", prerequisite: "read_th", readingConfig: R.ck },
+      { id: "read_digraph_mix", name: "Digraph Mix", icon: "sh·ch", prerequisite: "read_ck",
+        readingConfig: combine(R.sh, R.ch, R.th, R.ck) },
+    ],
+  },
+  {
+    name: "Blends",
+    color: "#22C55E",
+    skills: [
+      { id: "read_blend_start", name: "Start Blends", icon: "fr-", prerequisite: "read_digraph_mix", readingConfig: R.startBlends },
+      { id: "read_blend_end", name: "End Blends", icon: "-nd", prerequisite: "read_blend_start", readingConfig: R.endBlends },
+    ],
+  },
+  {
+    name: "Magic e",
+    color: "#EC4899",
+    skills: [
+      { id: "read_magic_e_ai", name: "a_e & i_e", icon: "a_e", prerequisite: "read_blend_end", readingConfig: R.aeie },
+      { id: "read_magic_e_ou", name: "o_e & u_e", icon: "o_e", prerequisite: "read_magic_e_ai", readingConfig: R.oeue },
+    ],
+  },
+  {
+    name: "Vowel Teams",
+    color: "#F97316",
+    skills: [
+      { id: "read_team_ee_ea", name: "ee & ea", icon: "ee", prerequisite: "read_magic_e_ou", readingConfig: R.eeea },
+      { id: "read_team_ai_oa", name: "ai & oa", icon: "ai", prerequisite: "read_team_ee_ea", readingConfig: R.aioa },
+      { id: "read_team_mix", name: "Team Mix", icon: "ee·oa", prerequisite: "read_team_ai_oa",
+        readingConfig: combine(R.eeea, R.aioa) },
+    ],
+  },
+];
+
+// Each reading skill may borrow look-alike words from anything taught up to that point.
+{
+  const known = new Set<string>();
+  for (const skill of READING_CURRICULUM.flatMap((s) => s.skills)) {
+    const cfg = skill.readingConfig!;
+    for (const w of [...cfg.words, ...cfg.extras]) known.add(w);
+    cfg.known = Array.from(known);
+  }
+}
+
+export const CURRICULA: Record<Subject, Section[]> = {
+  math: CURRICULUM,
+  reading: READING_CURRICULUM,
+};
+
+export const SUBJECTS: { id: Subject; name: string; icon: string }[] = [
+  { id: "math", name: "Math", icon: "🔢" },
+  { id: "reading", name: "Reading", icon: "📖" },
+];
+
+export const SUBJECT_SKILLS: Record<Subject, Skill[]> = {
+  math: CURRICULUM.flatMap((s) => s.skills),
+  reading: READING_CURRICULUM.flatMap((s) => s.skills),
+};
+
+export const SKILL_SUBJECT_MAP: Record<string, Subject> = Object.fromEntries(
+  (Object.keys(SUBJECT_SKILLS) as Subject[]).flatMap((subject) =>
+    SUBJECT_SKILLS[subject].map((skill) => [skill.id, subject])
+  )
+);
+
+export const ALL_SKILLS: Skill[] = [...SUBJECT_SKILLS.math, ...SUBJECT_SKILLS.reading];
 
 export const SKILL_MAP: Record<string, Skill> = Object.fromEntries(
   ALL_SKILLS.map((s) => [s.id, s])
 );
 
 export const SKILL_SECTION_MAP: Record<string, Section> = Object.fromEntries(
-  CURRICULUM.flatMap((section) =>
+  [...CURRICULUM, ...READING_CURRICULUM].flatMap((section) =>
     section.skills.map((skill) => [skill.id, section])
   )
 );

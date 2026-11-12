@@ -2,6 +2,7 @@ import { useState } from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import type { EquationBuilderProblem } from "../../lib/problems";
 import type { SubmitPayload } from "../../lib/context";
+import SpeakButton from "./SpeakButton";
 
 type Feedback = { result: "correct" | "wrong" } | null;
 
@@ -85,7 +86,13 @@ export default function EquationBuilderView({ problem, sectionColor, feedback, o
 
   return (
     <>
-      <Text style={styles.title}>Build the equation</Text>
+      <Text style={styles.title}>{problem.word ? "Build the word" : "Build the equation"}</Text>
+      {problem.word && (
+        <View style={styles.pictureRow}>
+          <Text style={styles.picture}>{problem.emoji}</Text>
+          <SpeakButton text={problem.word} color={sectionColor} />
+        </View>
+      )}
       <View style={styles.slotsRow}>
         {placed.map((val, i) => (
           <Pressable
@@ -137,6 +144,15 @@ const styles = StyleSheet.create({
     color: "#1E1B4B",
     marginBottom: 20,
     textAlign: "center",
+  },
+  pictureRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    marginBottom: 20,
+  },
+  picture: {
+    fontSize: 72,
   },
   slotsRow: {
     flexDirection: "row",

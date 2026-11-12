@@ -21,12 +21,34 @@ export type BubblePopProblem = {
   targetValue: number;
   bubbles: string[];
   correctIndices: number[];
+  /** Reading: replaces the "Tap all that equal N" heading, e.g. "Tap words that rhyme with cat". */
+  title?: string;
+  /** Reading: word the speaker button says aloud. */
+  speakText?: string;
 };
 
 export type EquationBuilderProblem = {
   kind: "equation_builder";
   tiles: string[];
   correctOrder: string[];
+  /** Reading: when set, the tiles spell this word instead of forming an equation. */
+  word?: string;
+  emoji?: string;
+};
+
+export type WordChoiceMode = "read_word" | "picture_word" | "missing_sound";
+
+/** Reading: one prompt, four tappable choices (words, pictures or sounds). */
+export type WordChoiceProblem = {
+  kind: "word_choice";
+  mode: WordChoiceMode;
+  word: string;
+  emoji: string;
+  /** missing_sound only: the word split around the blank, e.g. "c", "t". */
+  before?: string;
+  after?: string;
+  choices: string[];
+  answer: string;
 };
 
 export type OrderingProblem = {
@@ -40,7 +62,8 @@ export type Problem =
   | ComparisonProblem
   | BubblePopProblem
   | EquationBuilderProblem
-  | OrderingProblem;
+  | OrderingProblem
+  | WordChoiceProblem;
 
 // --- Session slot types ---
 
@@ -58,7 +81,7 @@ function randInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function shuffle<T>(arr: T[]): T[] {
+export function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
