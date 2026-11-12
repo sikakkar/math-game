@@ -1,0 +1,32 @@
+version: 1
+app:
+  # Expo (Metro) serves the web build on 8081. The backend is Supabase: local (Docker) on 54321 unless
+  # SUPABASE_URL and SUPABASE_ANON_KEY are already set, e.g. to a hosted project.
+  start: >-
+    [ -d node_modules ] || npm ci;
+    mkdir -p ~/logs;
+    if [ -z "$SUPABASE_URL" ]; then
+    S=node_modules/.bin/supabase;
+    $S status >/dev/null 2>&1 || $S start -x studio,imgproxy,edge-runtime,logflare,vector,mailpit > ~/logs/supabase.log 2>&1 || { tail -20 ~/logs/supabase.log; exit 1; };
+    eval "$($S status -o env 2>/dev/null | grep -E '^(API_URL|ANON_KEY)=')";
+    export SUPABASE_URL=$API_URL SUPABASE_ANON_KEY=$ANON_KEY;
+    fi;
+    CI=1 EXPO_NO_TELEMETRY=1 nohup npx expo start --web --port 8081 > ~/logs/expo.log 2>&1 &
+    for i in $(seq 1 120); do curl -sf -o /dev/null http://localhost:8081 && exit 0; sleep 2; done;
+    echo "expo did not answer on 8081" >&2; tail -20 ~/logs/expo.log; exit 1
+  stop: pkill -f "[e]xpo start" || true
+  frontendPort: 8081
+  backendPort: 54321
+  logs:
+    expo: ~/logs/expo.log
+    supabase: ~/logs/supabase.log
+  paths:
+    - app/
+    - lib/
+    - assets/
+    - supabase/
+  howToProve: >-
+    Open http://localhost:8081 in the Playwright browser (a phone-sized viewport suits it), create a player
+    profile, open the skill path and play a question to check the screens you changed. Data is in the local
+    Supabase (Docker): query it with curl against http://127.0.0.1:54321/rest/v1/<table>, sending the anon key from
+    `node_modules/.bin/supabase status -o env` as the apikey header. Without SUPABASE_URL the page is blank.
