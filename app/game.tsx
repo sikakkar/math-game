@@ -53,6 +53,8 @@ export default function GameScreen() {
     submitAnswer,
     nextProblem,
     isSessionOver,
+    sessionMode,
+    sessionLength,
   } = useGame();
   const router = useRouter();
   const [feedback, setFeedback] = useState<FeedbackState>(null);
@@ -122,10 +124,12 @@ export default function GameScreen() {
     <View style={styles.container}>
       <View style={styles.topBar}>
         <Text style={[styles.topText, { color: sectionColor }]}>
-          {skill?.name ?? "Practice"}
+          {sessionMode === "skip_quiz"
+            ? `Skip quiz → ${skill?.name ?? ""}`
+            : skill?.name ?? "Practice"}
         </Text>
         <Text style={styles.topText}>
-          {problemIndex + 1} / 10
+          {problemIndex + 1} / {sessionLength}
         </Text>
         <Text style={styles.topText}>
           {sessionScore} correct

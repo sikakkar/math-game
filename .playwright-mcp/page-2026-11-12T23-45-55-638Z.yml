@@ -1,0 +1,20 @@
+- generic [ref=e341]:
+  - generic [ref=e342]:
+    - generic [ref=e343]: Skip quiz → Sub to 5
+    - generic [ref=e344]: 5 / 5
+    - generic [ref=e345]: 4 correct
+  - generic [ref=e346]:
+    - generic [ref=e359]: Build the equation
+    - generic [ref=e360]:
+      - generic [ref=e377] [cursor=pointer]: "18"
+      - generic [ref=e378] [cursor=pointer]: +
+      - generic [ref=e379] [cursor=pointer]: "2"
+      - generic [ref=e380] [cursor=pointer]: =
+      - generic [ref=e381] [cursor=pointer]: "16"
+    - generic [ref=e366]:
+      - generic: "2"
+      - generic: =
+      - generic: +
+      - generic [active]: "16"
+      - generic: "18"
+    - generic [ref=e382] [cursor=pointer]: Check!

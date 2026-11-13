@@ -1,0 +1,9 @@
+- generic [ref=e9]:
+  - generic [ref=e12]: Who's playing?
+  - generic [ref=e13]:
+    - generic [ref=e14]: Tester
+    - generic [ref=e19]:
+      - textbox "Player name" [active] [ref=e20]
+      - generic [ref=e21]:
+        - generic [ref=e22] [cursor=pointer]: Create
+        - generic [ref=e24] [cursor=pointer]: Cancel
