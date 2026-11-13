@@ -1,0 +1,24 @@
+[    5767ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:8081/index.ts.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app&unstable_transformProfile=hermes-stable:17372
+[    5803ms] [LOG] Running application "main" with appParams:
+ {rootTag: #root, hydrate: undefined} 
+Development-level warnings: ON.
+Performance optimizations: OFF. @ http://localhost:8081/index.ts.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app&unstable_transformProfile=hermes-stable:65335
+[   18308ms] [ERROR] Failed to load resource: the server responded with a status of 406 (Not Acceptable) @ http://127.0.0.1:54321/rest/v1/profile_stats?select=*&profile_id=eq.364faffc-176c-4ab6-a0a8-2063c16facb5:0
+[  267280ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:8081/index.ts.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app&unstable_transformProfile=hermes-stable:17372
+[  267302ms] [LOG] Running application "main" with appParams:
+ {rootTag: #root, hydrate: undefined} 
+Development-level warnings: ON.
+Performance optimizations: OFF. @ http://localhost:8081/index.ts.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app&unstable_transformProfile=hermes-stable:65335
+[  267409ms] [ERROR] Failed to load resource: net::ERR_FAILED @ http://127.0.0.1:54321/rest/v1/profiles?select=*&order=created_at.asc:0
+[  269975ms] [ERROR] Failed to load resource: net::ERR_FAILED @ http://127.0.0.1:54321/rest/v1/profiles:0
+[  269978ms] [ERROR] Failed to load resource: net::ERR_FAILED @ http://127.0.0.1:54321/rest/v1/profiles?select=*&order=created_at.asc:0
+[  290112ms] [WARNING] Disconnected from Metro (1006)
+To reconnect:
+- Ensure that Metro is running and available on the same network
+- Reload this app (will trigger further help if Metro cannot be connected to) @ http://localhost:8081/index.ts.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app&unstable_transformProfile=hermes-stable:71455
+[  315183ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:8081/index.ts.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app&unstable_transformProfile=hermes-stable:17372
+[  315213ms] [LOG] Running application "main" with appParams:
+ {rootTag: #root, hydrate: undefined} 
+Development-level warnings: ON.
+Performance optimizations: OFF. @ http://localhost:8081/index.ts.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app&unstable_transformProfile=hermes-stable:65335
+[  320348ms] [ERROR] Failed to load resource: the server responded with a status of 406 (Not Acceptable) @ http://localhost:8081/__supabase/rest/v1/profile_stats?select=*&profile_id=eq.48f1c743-3c99-442d-b8ce-561914fe18c9:0
